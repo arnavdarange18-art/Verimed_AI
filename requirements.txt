@@ -1,3 +1,5 @@
+
+Requirements · TXT
 # ==== PHASE 1-3: Core pipeline (install this first) ====
 Flask
 groq
@@ -5,21 +7,25 @@ chromadb
 sentence-transformers
 python-dotenv
 streamlit
-
+ 
 # ==== PHASE 4: NER ====
 transformers
 torch
-
-# ==== PHASE 6: GNN (install later, larger download) ====
-# torch-geometric
-# datasets
-
+ 
+# ==== PHASE 6: GNN ====
+torch-geometric
+networkx
+ 
 # ==== PHASE 7: OCR ====
 easyocr
-
+ 
 # ==== Data sources ====
 requests
 biopython
-
+ 
 # ==== Health Passport (Day 4) ====
 qrcode[pil]
+ 
+# ==== Translation (Quick Win) ====
+deep-translator
+ 
