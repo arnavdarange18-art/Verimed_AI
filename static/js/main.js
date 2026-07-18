@@ -37,6 +37,44 @@ if (checkerForm) {
         });
     }
 
+    // ---- Voice-to-text (Web Speech API -- browser-native, no API key) ----
+    const voiceBtn = document.getElementById("voiceInputBtn");
+    const voiceLabel = document.getElementById("voiceInputLabel");
+    const claimTextarea = document.getElementById("claimTextarea");
+    const SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+    if (voiceBtn && SpeechRecognitionAPI) {
+        const recognition = new SpeechRecognitionAPI();
+        recognition.continuous = false;
+        recognition.interimResults = false;
+
+        voiceBtn.addEventListener("click", () => {
+            const langSelect = checkerForm.querySelector("select[name='language']");
+            recognition.lang = langSelect ? langSelect.value : "en-US";
+            recognition.start();
+            voiceBtn.classList.add("text-red-600");
+            voiceLabel.textContent = "Listening...";
+        });
+
+        recognition.addEventListener("result", (event) => {
+            const transcript = event.results[0][0].transcript;
+            claimTextarea.value = (claimTextarea.value ? claimTextarea.value + " " : "") + transcript;
+        });
+
+        recognition.addEventListener("end", () => {
+            voiceBtn.classList.remove("text-red-600");
+            voiceLabel.textContent = "Speak";
+        });
+
+        recognition.addEventListener("error", () => {
+            voiceBtn.classList.remove("text-red-600");
+            voiceLabel.textContent = "Speak";
+        });
+    } else if (voiceBtn) {
+        // Browser doesn't support Speech Recognition (e.g. Firefox) -- hide gracefully
+        voiceBtn.style.display = "none";
+    }
+
     checkerForm.addEventListener("submit", async (e) => {
         e.preventDefault();
 
@@ -127,6 +165,24 @@ function renderCheckerResult(data) {
 
     document.getElementById("shareVerdict").textContent = `Verdict: ${data.verdict || "Unverified"}`;
     document.getElementById("shareExplanation").textContent = data.explanation || "";
+
+    // ---- Text-to-speech: read the verdict + explanation aloud ----
+    const speakBtn = document.getElementById("speakResultBtn");
+    const speakLabel = document.getElementById("speakResultLabel");
+    if (speakBtn && "speechSynthesis" in window) {
+        speakBtn.onclick = () => {
+            window.speechSynthesis.cancel(); // stop any previous playback
+            const utterance = new SpeechSynthesisUtterance(
+                `Verdict: ${data.verdict}. ${data.explanation || ""}`
+            );
+            utterance.rate = 0.95;
+            utterance.onstart = () => { speakLabel.textContent = "Stop"; };
+            utterance.onend = () => { speakLabel.textContent = "Listen"; };
+            window.speechSynthesis.speak(utterance);
+        };
+    } else if (speakBtn) {
+        speakBtn.style.display = "none";
+    }
 }
 
 // ---------- Predictor page ----------
@@ -252,4 +308,95 @@ function showQrCode() {
     if (!qrContainer) return;
     // Cache-bust so the browser doesn't show a stale QR after an update
     qrContainer.innerHTML = `<img src="/api/passport/qr?t=${Date.now()}" alt="Health Passport QR Code" class="w-40 h-40 object-contain" />`;
+}
+
+// ---------- Home page: Personalized Snapshot ----------
+
+const passportSnapshotCard = document.getElementById("passportSnapshotCard");
+if (passportSnapshotCard) {
+    fetch("/api/passport")
+        .then((res) => res.json())
+        .then((data) => {
+            const emptyState = document.getElementById("passportSnapshotEmpty");
+            const snapshotCard = document.getElementById("passportSnapshotCard");
+            const qrCard = document.getElementById("passportSnapshotQr");
+
+            if (!data || !data.full_name) {
+                emptyState.classList.remove("hidden");
+                return;
+            }
+
+            document.getElementById("snapName").textContent = data.full_name || "--";
+            document.getElementById("snapBlood").textContent = data.blood_group || "--";
+            document.getElementById("snapAllergies").textContent = data.allergies || "None listed";
+            document.getElementById("snapMeds").textContent = data.current_medicines || "None listed";
+
+            const snapQrContainer = document.getElementById("snapQrContainer");
+            snapQrContainer.innerHTML = `<img src="/api/passport/qr?t=${Date.now()}" alt="Emergency QR" class="w-28 h-28 object-contain" />`;
+
+            snapshotCard.classList.remove("hidden");
+            qrCard.classList.remove("hidden");
+        })
+        .catch(() => {
+            document.getElementById("passportSnapshotEmpty").classList.remove("hidden");
+        });
+}
+
+// ---------- Home page: Trending Misinformation ----------
+
+const trendingContainer = document.getElementById("trendingContainer");
+if (trendingContainer) {
+    fetch("/api/trending?limit=5")
+        .then((res) => res.json())
+        .then((trending) => {
+            if (!trending || trending.length === 0) {
+                trendingContainer.innerHTML = `<div class="text-center text-slate-400 text-sm py-6">No trends yet -- check a few claims to build history.</div>`;
+                return;
+            }
+
+            trendingContainer.innerHTML = trending.map((t) => {
+                const colors = verdictColorClasses(t.verdict);
+                return `
+                    <div class="bg-white p-4 rounded-xl border ${colors.badge} flex items-center justify-between gap-4">
+                        <div class="flex items-center gap-3 min-w-0">
+                            <span class="text-[10px] font-black uppercase px-2 py-1 rounded-full ${colors.badge} shrink-0">${escapeHtml(t.verdict || "Unverified")}</span>
+                            <p class="text-sm font-semibold text-slate-700 truncate">"${escapeHtml(t.claim_text || "")}"</p>
+                        </div>
+                        <span class="text-xs font-bold text-slate-400 shrink-0">${escapeHtml(t.check_count)}x checked</span>
+                    </div>`;
+            }).join("");
+        })
+        .catch(() => {
+            trendingContainer.innerHTML = `<div class="text-center text-red-400 text-sm py-6">Couldn't load trending data.</div>`;
+        });
+}
+
+// ---------- Home page: Latest Health Alerts (live from history) ----------
+
+const latestAlertsContainer = document.getElementById("latestAlertsContainer");
+if (latestAlertsContainer) {
+    fetch("/api/history?limit=3")
+        .then((res) => res.json())
+        .then((history) => {
+            if (!history || history.length === 0) {
+                latestAlertsContainer.innerHTML = `
+                    <div class="md:col-span-3 text-center text-slate-400 text-sm py-6">
+                        No claims checked yet. <a href="/checker" class="text-blue-600 font-bold hover:underline">Check your first claim &rarr;</a>
+                    </div>`;
+                return;
+            }
+
+            latestAlertsContainer.innerHTML = history.map((h) => {
+                const colors = verdictColorClasses(h.verdict);
+                return `
+                    <div class="bg-white p-5 border rounded-2xl shadow-sm ${colors.badge}">
+                        <span class="text-xs font-black uppercase tracking-wide">${escapeHtml(h.verdict || "Unverified")}</span>
+                        <p class="text-sm font-bold text-slate-800 mt-2 leading-snug">"${escapeHtml((h.claim_text || "").slice(0, 90))}${(h.claim_text || "").length > 90 ? "..." : ""}"</p>
+                        <p class="text-xs text-slate-400 mt-2">${escapeHtml(h.timestamp || "")}</p>
+                    </div>`;
+            }).join("");
+        })
+        .catch(() => {
+            latestAlertsContainer.innerHTML = `<div class="md:col-span-3 text-center text-red-400 text-sm py-6">Couldn't load recent alerts.</div>`;
+        });
 }

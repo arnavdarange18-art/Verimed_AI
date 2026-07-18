@@ -1,10 +1,18 @@
 {% extends 'base.html' %}
 {% block content %}
 <div class="mb-8 p-8 rounded-3xl bg-gradient-to-r from-blue-600 via-cyan-600 to-emerald-600 text-white shadow-xl shadow-blue-100">
-    <h1 class="text-3xl font-black mb-2">Welcome to VeriMed AI Portal</h1>
-    <p class="text-blue-100 max-w-2xl text-sm leading-relaxed">
+    <h1 class="text-3xl font-black mb-2">Verify Before You Trust.</h1>
+    <p class="text-blue-100 max-w-2xl text-sm leading-relaxed mb-6">
         An advanced, three-layer artificial intelligence framework engineered to detect malicious health fabrications, supply context-aware validation, and map epidemiological virality profiles.
     </p>
+    <div class="flex flex-wrap gap-3">
+        <a href="/checker" class="bg-white text-blue-700 font-bold text-sm px-6 py-3 rounded-xl shadow-lg hover:shadow-xl transition-shadow inline-flex items-center gap-2">
+            <i class="fa-solid fa-magnifying-glass-shield"></i> Verify Health Claim
+        </a>
+        <a href="/passport" class="bg-white/15 border border-white/40 text-white font-bold text-sm px-6 py-3 rounded-xl hover:bg-white/25 transition-colors inline-flex items-center gap-2">
+            <i class="fa-solid fa-id-card-clip"></i> Check Your Health Passport
+        </a>
+    </div>
 </div>
 
 <!-- Live Counter Cards -->
@@ -43,6 +51,106 @@
         <div class="text-emerald-600 bg-emerald-50 w-12 h-12 rounded-xl flex items-center justify-center text-xl mb-4 font-bold">03</div>
         <h4 class="font-bold text-lg text-slate-800 mb-2">GNN Network Modeler</h4>
         <p class="text-sm text-slate-500 leading-relaxed">Constructs structured relationship topologies to dynamically predict macro-level sharing virality vectors[cite: 1].</p>
+    </div>
+</div>
+
+<!-- Personalized Snapshot -- ties Health Passport into the home page -->
+<div class="mt-8 grid grid-cols-1 md:grid-cols-3 gap-6">
+    <div id="passportSnapshotEmpty" class="md:col-span-3 bg-white p-6 border border-dashed border-slate-300 rounded-2xl text-center hidden">
+        <i class="fa-solid fa-id-card-clip text-3xl text-slate-300 mb-3"></i>
+        <p class="text-sm font-bold text-slate-500">No Health Passport set up yet</p>
+        <p class="text-xs text-slate-400 mb-4">Add your profile once to get personalized risk flags on every claim you check.</p>
+        <a href="/passport" class="inline-block bg-blue-600 text-white text-xs font-bold px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors">Set Up Health Passport</a>
+    </div>
+
+    <div id="passportSnapshotCard" class="md:col-span-2 bg-white p-6 border border-slate-100 rounded-2xl shadow-sm hidden">
+        <div class="flex items-center justify-between mb-4">
+            <h4 class="font-bold text-lg text-slate-800"><i class="fa-solid fa-id-card-clip text-blue-600 mr-2"></i>Your Health Snapshot</h4>
+            <a href="/passport" class="text-xs font-bold text-blue-600 hover:underline">Edit</a>
+        </div>
+        <div class="grid grid-cols-2 gap-3 text-sm">
+            <div><span class="text-xs uppercase font-bold text-slate-400 block">Name</span><span id="snapName" class="font-semibold text-slate-700">--</span></div>
+            <div><span class="text-xs uppercase font-bold text-slate-400 block">Blood Group</span><span id="snapBlood" class="font-semibold text-slate-700">--</span></div>
+            <div class="col-span-2"><span class="text-xs uppercase font-bold text-slate-400 block">Allergies</span><span id="snapAllergies" class="font-semibold text-slate-700">--</span></div>
+            <div class="col-span-2"><span class="text-xs uppercase font-bold text-slate-400 block">Current Medicines</span><span id="snapMeds" class="font-semibold text-slate-700">--</span></div>
+        </div>
+    </div>
+    <div id="passportSnapshotQr" class="bg-slate-900 p-6 rounded-2xl shadow-sm flex flex-col items-center justify-center hidden">
+        <span class="text-[10px] uppercase tracking-wider font-bold text-slate-400 mb-3">Emergency QR</span>
+        <div id="snapQrContainer" class="bg-white p-2 rounded-xl"></div>
+        <span class="text-[10px] text-slate-500 mt-3 text-center">Scan for emergency medical info</span>
+    </div>
+</div>
+
+<!-- Latest Health Alerts -- live from checked-claim history -->
+<div class="mt-10">
+    <div class="flex items-center justify-between mb-4">
+        <h3 class="font-black text-xl text-slate-800"><i class="fa-solid fa-triangle-exclamation text-amber-500 mr-2"></i>Latest Health Alerts</h3>
+        <a href="/checker" class="text-xs font-bold text-blue-600 hover:underline">Check a new claim &rarr;</a>
+    </div>
+    <div id="latestAlertsContainer" class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div class="md:col-span-3 text-center text-slate-400 text-sm py-6">
+            <i class="fa-solid fa-spinner fa-spin mr-2"></i>Loading recent activity...
+        </div>
+    </div>
+</div>
+
+<!-- Trending Misinformation -->
+<div class="mt-10">
+    <div class="flex items-center justify-between mb-4">
+        <h3 class="font-black text-xl text-slate-800"><i class="fa-solid fa-arrow-trend-up text-red-500 mr-2"></i>Trending Misinformation</h3>
+        <span class="text-[10px] uppercase font-bold text-slate-400">Most-checked claims, all time</span>
+    </div>
+    <div id="trendingContainer" class="flex flex-col gap-3">
+        <div class="text-center text-slate-400 text-sm py-6">
+            <i class="fa-solid fa-spinner fa-spin mr-2"></i>Loading trends...
+        </div>
+    </div>
+</div>
+
+<!-- Health Tips -->
+<div class="mt-10">
+    <h3 class="font-black text-xl text-slate-800 mb-4"><i class="fa-solid fa-heart-pulse text-emerald-500 mr-2"></i>Tips for Good Health</h3>
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div class="bg-emerald-50 border border-emerald-100 p-5 rounded-2xl">
+            <i class="fa-solid fa-droplet text-emerald-600 text-xl mb-2"></i>
+            <p class="text-sm font-bold text-slate-700">Stay Hydrated</p>
+            <p class="text-xs text-slate-500 mt-1">Hydration needs vary by person -- listen to your body over rigid rules.</p>
+        </div>
+        <div class="bg-blue-50 border border-blue-100 p-5 rounded-2xl">
+            <i class="fa-solid fa-person-walking text-blue-600 text-xl mb-2"></i>
+            <p class="text-sm font-bold text-slate-700">Move Daily</p>
+            <p class="text-xs text-slate-500 mt-1">Regular activity lowers cardiovascular risk, confirmed by CDC data.</p>
+        </div>
+        <div class="bg-amber-50 border border-amber-100 p-5 rounded-2xl">
+            <i class="fa-solid fa-bed text-amber-600 text-xl mb-2"></i>
+            <p class="text-sm font-bold text-slate-700">Prioritize Sleep</p>
+            <p class="text-xs text-slate-500 mt-1">7-9 hours supports immune function and mental health.</p>
+        </div>
+        <div class="bg-purple-50 border border-purple-100 p-5 rounded-2xl">
+            <i class="fa-solid fa-magnifying-glass text-purple-600 text-xl mb-2"></i>
+            <p class="text-sm font-bold text-slate-700">Verify Before Sharing</p>
+            <p class="text-xs text-slate-500 mt-1">Run health claims through VeriMed before forwarding them.</p>
+        </div>
+    </div>
+</div>
+
+<!-- Testimonials -->
+<div class="mt-10 mb-4">
+    <h3 class="font-black text-xl text-slate-800 mb-4"><i class="fa-solid fa-comment-dots text-blue-500 mr-2"></i>What People Are Saying</h3>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div class="bg-white p-6 border border-slate-100 rounded-2xl shadow-sm">
+            <p class="text-sm text-slate-500 italic leading-relaxed">"I check every WhatsApp forward here before I trust it now."</p>
+            <p class="text-xs font-bold text-slate-700 mt-3">— Beta Tester</p>
+        </div>
+        <div class="bg-white p-6 border border-slate-100 rounded-2xl shadow-sm">
+            <p class="text-sm text-slate-500 italic leading-relaxed">"The Health Passport QR saved us time in the ER when my father couldn't speak clearly."</p>
+            <p class="text-xs font-bold text-slate-700 mt-3">— Beta Tester</p>
+        </div>
+        <div class="bg-white p-6 border border-slate-100 rounded-2xl shadow-sm">
+            <p class="text-sm text-slate-500 italic leading-relaxed">"Finally a fact-checker that shows its sources instead of just saying 'false'."</p>
+            <p class="text-xs font-bold text-slate-700 mt-3">— Beta Tester</p>
+        </div>
     </div>
 </div>
 {% endblock %}

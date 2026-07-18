@@ -5,6 +5,7 @@ from verify_v2 import verify_claim
 import db
 import health_passport as hp
 import ocr_utils
+import translate_utils
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("FLASK_SECRET_KEY", "dev-only-change-me")
@@ -91,20 +92,33 @@ def api_verify():
     if not claim_text:
         return jsonify({"error": "No claim text provided."}), 400
 
+    # Translate non-English TEXT claims into English before running the
+    # NER/RAG/LLM pipeline (which operates in English). OCR path above is
+    # already restricted to English images, so this only applies to typed
+    # or voice-transcribed text in another language.
+    original_claim_text = claim_text
+    if language != "en" and not ocr_used:
+        claim_text = translate_utils.translate_to_english(claim_text, language)
+
     result = verify_claim(claim_text)
 
-    # Persist to history
+    # Persist to history in English (keeps retrieval/history consistent)
     db.save_result(claim_text, result)
+
+    # Translate the explanation back into the user's selected language for display
+    explanation_for_display = result.get("explanation", "")
+    if language != "en":
+        explanation_for_display = translate_utils.translate_from_english(explanation_for_display, language)
 
     response = {
         "verdict": result.get("verdict"),
         "confidence": result.get("confidence"),
-        "explanation": result.get("explanation"),
+        "explanation": explanation_for_display,
         "entities": result.get("entities", []),
         "sources": result.get("sources", []),
         "language_processed": language,
         "ocr_used": ocr_used,
-        "claim_text_used": claim_text if ocr_used else None,
+        "claim_text_used": claim_text if (ocr_used or language != "en") else None,
     }
     return jsonify(response)
 
@@ -113,6 +127,12 @@ def api_verify():
 def api_history():
     limit = request.args.get('limit', default=20, type=int)
     return jsonify(db.get_history(limit=limit))
+
+
+@app.route('/api/trending', methods=['GET'])
+def api_trending():
+    limit = request.args.get('limit', default=5, type=int)
+    return jsonify(db.get_trending_verdicts(limit=limit))
 
 
 @app.route('/api/predict_spread', methods=['POST'])

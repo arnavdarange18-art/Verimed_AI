@@ -18,8 +18,14 @@
             </div>
 
             <div>
-                <label class="block text-xs uppercase tracking-wider font-bold text-slate-400 mb-2">Text or Target Web URL</label>
-                <textarea name="claim" rows="4" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm focus:outline-none focus:border-blue-500 placeholder-slate-400" placeholder="Paste suspicious social claims, health assertions, or online links here..."></textarea>
+                <div class="flex items-center justify-between mb-2">
+                    <label class="block text-xs uppercase tracking-wider font-bold text-slate-400">Text or Target Web URL</label>
+                    <button type="button" id="voiceInputBtn" title="Speak your claim instead of typing"
+                        class="text-[11px] font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1 transition-colors">
+                        <i class="fa-solid fa-microphone"></i> <span id="voiceInputLabel">Speak</span>
+                    </button>
+                </div>
+                <textarea id="claimTextarea" name="claim" rows="4" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm focus:outline-none focus:border-blue-500 placeholder-slate-400" placeholder="Paste suspicious social claims, health assertions, or online links here..."></textarea>
             </div>
 
             <div class="border-2 border-dashed border-slate-200 rounded-xl p-4 text-center hover:bg-slate-50 transition-colors cursor-pointer relative">
@@ -45,14 +51,20 @@
         <!-- Hidden Output Card Panel Structure filled by JS Processing -->
         <div id="resultsCard" class="hidden flex flex-col gap-5">
             <div id="verdictBadge" class="p-5 rounded-2xl border flex flex-col gap-2">
-                <span id="verdictLabel" class="text-2xl font-black uppercase tracking-tight"></span>
+                <div class="flex items-center justify-between">
+                    <span id="verdictLabel" class="text-2xl font-black uppercase tracking-tight"></span>
+                    <button type="button" id="speakResultBtn" title="Read result aloud"
+                        class="text-xs font-bold bg-white/60 hover:bg-white px-3 py-1.5 rounded-lg border border-current/20 flex items-center gap-1.5 transition-colors">
+                        <i class="fa-solid fa-volume-high"></i> <span id="speakResultLabel">Listen</span>
+                    </button>
+                </div>
                 <p id="explanationText" class="text-sm text-slate-700 leading-relaxed"></p>
             </div>
 
-            <!-- Pipeline Confidence Graph Meter -->
+            <!-- Trust Score Meter -->
             <div class="bg-white p-5 rounded-2xl border border-slate-200/80">
                 <div class="flex justify-between text-xs font-bold uppercase tracking-wider mb-2 text-slate-500">
-                    <span>Algorithmic System Confidence Score</span>
+                    <span><i class="fa-solid fa-shield-halved mr-1"></i> Trust Score</span>
                     <span id="confidenceValue">0%</span>
                 </div>
                 <div class="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden">

@@ -23,3 +23,6 @@ biopython
 
 # ==== Health Passport (Day 4) ====
 qrcode[pil]
+
+# ==== Translation (Quick Win) ====
+deep-translator
