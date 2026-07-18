@@ -1,0 +1,21 @@
+# ==== PHASE 1-3: Core pipeline (install this first) ====
+groq
+chromadb
+sentence-transformers
+python-dotenv
+streamlit
+
+# ==== PHASE 4: NER ====
+transformers
+torch
+
+# ==== PHASE 6: GNN (install later, larger download) ====
+# torch-geometric
+# datasets
+
+# ==== PHASE 7: OCR ====
+# easyocr
+
+# ==== Data sources ====
+requests
+biopython
