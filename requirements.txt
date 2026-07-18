@@ -19,3 +19,7 @@ torch
 # ==== Data sources ====
 requests
 biopython
+
+# ==== Health Passport (Day 4) ====
+qrcode[pil]
+ 

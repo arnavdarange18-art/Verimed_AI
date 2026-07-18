@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VeriMed AI - Health Integrity Platform</title>
+    <!-- Tailwind CSS Engine for Quick Structural Utilities -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="bg-slate-50 min-h-screen flex flex-col">
+
+    <!-- Top Navigation Bar -->
+    <nav class="bg-white border-b border-slate-200 px-6 py-4 flex justify-between items-center sticky top-0 z-50">
+        <div class="flex items-center gap-3">
+            <div class="bg-blue-600 text-white p-2 rounded-xl shadow-md shadow-blue-200">
+                <i class="fa-solid fa-user-md text-xl"></i>
+            </div>
+            <div>
+                <span class="font-extrabold text-xl text-slate-800 tracking-tight">VeriMed AI</span>
+                <span class="text-xs block text-slate-400 font-semibold tracking-wider uppercase">Verify Before You Trust</span>
+            </div>
+        </div>
+        <div class="flex items-center gap-6 font-semibold text-sm text-slate-600">
+            <a href="/" class="hover:text-blue-600 transition-colors"><i class="fa-solid fa-chart-pie mr-1"></i> Dashboard</a>
+            <a href="/checker" class="hover:text-blue-600 transition-colors"><i class="fa-solid fa-magnifying-glass-shield mr-1"></i> AI Fact Checker</a>
+            <a href="/predictor" class="hover:text-blue-600 transition-colors"><i class="fa-solid fa-diagram-project mr-1"></i> GNN Predictor</a>
+            <a href="/passport" class="hover:text-blue-600 transition-colors"><i class="fa-solid fa-id-card-clip mr-1"></i> Health Passport</a>
+        </div>
+    </nav>
+
+    <!-- Main Dynamic Content Wrapper -->
+    <main class="flex-1 max-w-7xl w-full mx-auto p-6">
+        {% block content %}{% endblock %}
+    </main>
+
+    <footer class="text-center py-6 text-xs font-semibold text-slate-400 border-t border-slate-200 bg-white">
+        Data Grounded via Live Academic Access Channels: WHO &middot; CDC &middot; NIH &middot; PubMed
+    </footer>
+
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html>

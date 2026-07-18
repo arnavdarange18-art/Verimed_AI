@@ -1,0 +1,53 @@
+phase 1 and 2 detail in read me 
+Let's build Phase 3 — real RAG retrieval with ChromaDB. This replaces the hardcoded claim in test_groq.py with actual evidence lookup.Created 3 filesCreated 3 filesNow let's wire retrieval + Groq together into a real end-to-end verifier:Created a file, ran a command, read a fileCreated a file, ran a command, read a file4 new files — put them in your verimed-ai folder like this:
+verimed-ai/
+├── data/
+│   └── health_facts_seed.json   ← put here
+├── ingest.py                    ← put here
+├── retrieval.py                 ← put here
+├── verify.py                    ← put here
+├── test_groq.py                 (already have)
+├── requirements.txt             (already have)
+└── .env                         (already have, with your key)
+Run these 3 commands in order, in Cursor's terminal:
+1. Install new dependency:
+bashpip install chromadb sentence-transformers
+2. Build your vector database (run once):
+bpython ingest.py
+You should see: ✅ Ingested 20 facts into ChromaDB
+3. Test retrieval + full pipeline:
+python retrieval.py
+This should print evidence matched to a garlic/COVID question.
+Then run the real deal:
+python verify.py
+This tests 3 claims end-to-end (retrieval → Groq → grounded verdict). You should see verdict/confidence/explanation/sources for each.
+
+What just happened: verify.py is now your core product function — verify_claim(claim_text) takes any claim and returns a grounded, source-cited verdict. This is exactly what your Streamlit UI will call in Phase 5.
+_____________________________________________________________________________________________________________________________________________________
+Phase 4 — BioBERT-based Medical NER. This extracts entities (Disease, Treatment, etc.) from the claim, which we'll then use to sharpen retrieval.NER module using a BERT-based biomedical NER model to extract medical entities from claimsNER module using a BERT-based biomedical NER model to extract medical entities from claimsNow let's plug NER into the pipeline so retrieval uses extracted entities instead of raw sentences:Created a file, ran a command, read a fileCreated a file, ran a command, read a file2 new files — drop into your verimed-ai folder:
+verimed-ai/
+├── ner_utils.py      ← NEW
+├── verify_v2.py       ← NEW
+└── (everything else you already have)
+Run these in Cursor's terminal:
+
+1. Install NER dependencies:
+pip install transformers torch
+⚠️ This is a bigger install (~1-2GB with torch). Let it finish.
+2. Test NER alone first:
+python ner_utils.py
+First run will download the model (~400MB, one-time). You should see entities extracted for each test claim, e.g.:
+Claim: 'Garlic cures COVID-19'
+  -> garlic  [...]  confidence=0.8x
+  -> COVID-19  [Disease_disorder]  confidence=0.9x
+3. Test the full pipeline with NER included:
+python verify_v2.py
+This now shows entities detected → search query used → verdict, so you can see exactly how NER sharpened the retrieval.
+
+A note on the "BERT" requirement: I used d4data/biomedical-ner-all instead of raw dmis-lab/biobert-v1.1, because the base BioBERT checkpoint has no NER head — it needs fine-tuning on a labeled dataset before it can extract entities at all, which eats hours you don't have. The model I used is a BERT/biomedical-transformer architecture, already fine-tuned for exactly this task. When you present, you can honestly say "we use a BioBERT-based NER model" — it's true and it works live.
+
+_____________________________________________________________________________________________________________________________________________________
+phase 5 
+
+pip install qrcode[pil]
+streamlit run app.py

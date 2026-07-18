@@ -1,0 +1,56 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+    <div class="lg:col-span-7 bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm">
+        <h2 class="text-xl font-bold text-slate-800 mb-4"><i class="fa-solid fa-id-card-clip text-emerald-600 mr-2"></i>Emergency Profile Assembly</h2>
+        
+        <form id="passportForm" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+                <label class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">Full Name</label>
+                <input type="text" id="passName" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs focus:outline-none focus:border-emerald-500" required>
+            </div>
+            <div>
+                <label class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">Blood Classification Group</label>
+                <select id="passBlood" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs focus:outline-none focus:border-emerald-500">
+                    <option>A+</option><option>O+</option><option>B+</option><option>AB+</option>
+                    <option>A-</option><option>O-</option><option>B-</option><option>AB-</option>
+                </select>
+            </div>
+            <div class="md:col-span-2">
+                <label class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">Critical Medical Allergies</label>
+                <input type="text" id="passAllergies" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs focus:outline-none focus:border-emerald-500" placeholder="e.g. Penicillin, Sulfa drugs, Nuts">
+            </div>
+            <div class="md:col-span-2">
+                <label class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">Active Prescribed Medications</label>
+                <textarea id="passMeds" rows="2" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs focus:outline-none focus:border-emerald-500"></textarea>
+            </div>
+            <div>
+                <label class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">Emergency Point of Contact</label>
+                <input type="text" id="passContact" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs focus:outline-none focus:border-emerald-500">
+            </div>
+            <div>
+                <label class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">Contact Emergency Phone Line</label>
+                <input type="tel" id="passPhone" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs focus:outline-none focus:border-emerald-500">
+            </div>
+            
+            <button type="submit" class="md:col-span-2 mt-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-xl transition-colors text-xs tracking-wider uppercase">
+                Compile & Encrypt Locally
+            </button>
+        </form>
+    </div>
+
+    <!-- Generated Target Output Summary Display Section -->
+    <div class="lg:col-span-5 flex flex-col gap-6">
+        <div class="bg-gradient-to-br from-emerald-800 to-teal-950 text-white p-6 rounded-2xl shadow-lg flex flex-col items-center justify-center text-center gap-4 min-h-[350px]">
+            <h4 class="font-bold text-sm tracking-wider uppercase text-emerald-300">Generated Verification Engine Target Token</h4>
+            <!-- QR Verification Placeholder Area -->
+            <div class="bg-white p-4 rounded-xl shadow-inner inline-block" id="qrContainer">
+                <i class="fa-solid fa-qrcode text-8xl text-slate-300 p-4"></i>
+            </div>
+            <p class="text-[11px] text-emerald-200/80 max-w-xs leading-relaxed">
+                Scan targets execute cryptographic vector translations parsing medical criteria during intake cycles instantly.
+            </p>
+        </div>
+    </div>
+</div>
+{% endblock %}

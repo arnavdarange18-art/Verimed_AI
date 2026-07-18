@@ -1,0 +1,26 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm mb-6">
+    <h2 class="text-xl font-bold text-slate-800 mb-2"><i class="fa-solid fa-diagram-project text-purple-600 mr-2"></i>Graph Attention Network (GAT) Virality Predictor[cite: 1]</h2>
+    <p class="text-sm text-slate-500 leading-relaxed">
+        This portal accesses structural graph learning parameters trained over historical datasets to assess network expansion momentum before claims transition into high-velocity public cycles[cite: 1].
+    </p>
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+    <div class="lg:col-span-4 bg-white p-5 rounded-2xl border border-slate-200/80 flex flex-col gap-4">
+        <h3 class="text-xs uppercase font-bold tracking-wider text-slate-400">Initialize GNN Simulation</h3>
+        <textarea id="predictInput" rows="4" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs focus:outline-none focus:border-purple-500 placeholder-slate-400" placeholder="Enter target health narrative structure..."></textarea>
+        <button onclick="runPredictionPipeline()" class="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 text-xs rounded-xl transition-colors">
+            Analyze Network Node Dynamics
+        </button>
+    </div>
+
+    <div class="lg:col-span-8 bg-slate-900 text-slate-100 p-6 rounded-2xl shadow-inner flex flex-col gap-6 min-h-[350px]" id="predictOutputPanel">
+        <div class="m-auto text-center text-slate-500 font-bold text-xs flex flex-col gap-2 items-center">
+            <i class="fa-solid fa-circle-nodes text-3xl text-purple-500/50 animate-pulse"></i>
+            Awaiting GNN Engine Sequence Matrix Initialization
+        </div>
+    </div>
+</div>
+{% endblock %}

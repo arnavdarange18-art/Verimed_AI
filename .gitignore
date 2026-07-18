@@ -1,0 +1,23 @@
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Python artifacts
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# Virtual environments
+.venv/
+venv/
+
+# Database / vector store artifacts
+chroma_db/
+*.db
+*.sqlite3
+
+# OS / editor files
+.DS_Store
+.vscode/
