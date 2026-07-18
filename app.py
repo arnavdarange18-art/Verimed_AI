@@ -6,6 +6,8 @@ import db
 import health_passport as hp
 import ocr_utils
 import translate_utils
+from gnn.gnn_predict import predict_spread
+print("✅ VERIMED GNN MODULE LOADED SUCCESSFULLY — v2")
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("FLASK_SECRET_KEY", "dev-only-change-me")
@@ -138,23 +140,25 @@ def api_trending():
 @app.route('/api/predict_spread', methods=['POST'])
 def api_predict_spread():
     """
-    Spread Risk Modeling.
-    NOTE: the real GNN/GAT layer (Phase 6) isn't built yet -- this is a
-    clearly-labeled heuristic placeholder, not the trained model described
-    in the pitch. Swap this out once Phase 6 lands.
+    Spread Risk Modeling -- now powered by a real trained Graph Attention
+    Network (Phase 6). See gnn/ for the model, training script, and
+    inference code. Falls back to a labeled heuristic if the model can't
+    load or inference fails, so this endpoint never hard-crashes.
     """
     claim = (request.json or {}).get('claim', '')
     if not claim.strip():
         return jsonify({"error": "No claim provided."}), 400
 
-    graph_data = {
-        "virality_score": 87,
-        "risk_level": "High Risk",
-        "predicted_nodes_reached": 14200,
-        "time_to_peak_hours": 12,
-        "network_hubs_vulnerable": ["WhatsApp Forwards Cluster A", "Public FB Groups"],
-        "is_simulated": True,  # tells the frontend to label this as a placeholder
-    }
+    # Run the same verification pipeline used by /api/verify so the GNN's
+    # risk features (verdict, confidence, entities) are grounded in real
+    # evidence, not guessed independently.
+    verification = verify_claim(claim)
+    graph_data = predict_spread(
+        claim_text=claim,
+        verdict=verification.get("verdict", "Unverified"),
+        confidence=verification.get("confidence", 0),
+        entities=verification.get("entities", []),
+    )
     return jsonify(graph_data)
 
 
