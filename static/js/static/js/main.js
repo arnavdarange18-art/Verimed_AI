@@ -79,20 +79,6 @@ function renderCheckerResult(data) {
 
     const verdictBadge = document.getElementById("verdictBadge");
     verdictBadge.className = `p-5 rounded-2xl border flex flex-col gap-2 ${colors.badge}`;
-
-    // If the claim came from an uploaded screenshot, show the OCR'd text so
-    // the user can confirm it was read correctly before trusting the verdict.
-    let ocrNote = "";
-    const existingOcrNote = document.getElementById("ocrExtractedNote");
-    if (existingOcrNote) existingOcrNote.remove();
-    if (data.ocr_used && data.claim_text_used) {
-        ocrNote = document.createElement("div");
-        ocrNote.id = "ocrExtractedNote";
-        ocrNote.className = "text-[11px] font-semibold text-slate-500 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 mb-1";
-        ocrNote.innerHTML = `<i class="fa-solid fa-text-height mr-1"></i> Text read from image: "${escapeHtml(data.claim_text_used)}"`;
-        verdictBadge.parentElement.insertBefore(ocrNote, verdictBadge);
-    }
-
     document.getElementById("verdictLabel").textContent = data.verdict || "Unverified";
     document.getElementById("explanationText").textContent = data.explanation || "";
 
