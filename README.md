@@ -29,7 +29,6 @@ pip install groq chromadb sentence-transformers python-dotenv streamlit
 2. Sign up (free, no credit card needed)
 3. Click "Create API Key", copy it
 
-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
 
 ## Step 5 -- Add your key
 1. Rename `.env.example` to `.env`
