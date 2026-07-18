@@ -1,20 +1,30 @@
-from flask import Flask, render_template, request, jsonify
-import json
+from flask import Flask, render_template, request, jsonify, Response
 import os
 
-# Placeholder imports matching your engineering pipeline
-# from verify_v2 import verify_claim
-# from health_passport import generate_qr_code
+from verify_v2 import verify_claim
+import db
+import health_passport as hp
+import ocr_utils
 
 app = Flask(__name__)
-app.secret_key = "verimed_secure_session_key"
+app.secret_key = os.environ.get("FLASK_SECRET_KEY", "dev-only-change-me")
+
+# Make sure tables exist before anything else runs
+db.init_db()
+hp.init_passport_table()
 
 # --- PAGE ROUTING ---
 
 @app.route('/')
 def home():
-    # Home/Dashboard with overview metrics
-    stats = {"total_checked": 142, "true_count": 58, "false_count": 64, "misleading_count": 20}
+    raw_stats = db.get_stats()
+    by_verdict = raw_stats.get("by_verdict", {})
+    stats = {
+        "total_checked": raw_stats.get("total_checked", 0),
+        "true_count": by_verdict.get("True", 0),
+        "false_count": by_verdict.get("False", 0),
+        "misleading_count": by_verdict.get("Misleading", 0),
+    }
     return render_template('index.html', stats=stats)
 
 @app.route('/checker')
@@ -34,44 +44,128 @@ def passport():
 @app.route('/api/verify', methods=['POST'])
 def api_verify():
     """Handles multimodal/multilingual inputs (Text, URL, Images via OCR)"""
-    claim_text = request.form.get('claim', '')
+    claim_text = request.form.get('claim', '').strip()
     language = request.form.get('language', 'en')
-    
+    ocr_used = False
+
     # Handle Image Upload for OCR processing
     if 'image' in request.files and request.files['image'].filename != '':
         image_file = request.files['image']
-        # text_extracted = easyocr_instance.readtext(image_file.read())
-        claim_text = "Extracted text from uploaded screenshot sample" 
+        image_bytes = image_file.read()
 
-    # Mock response demonstrating architecture values
-    result = {
-        "verdict": "False",
-        "confidence": 94,
-        "explanation": "This claim contradicts verified clinical trials and systemic data published by the WHO and CDC. There is no empirical medical evidence supporting this mechanism.",
-        "entities": [
-            {"text": "Garlic tea", "label": "Treatment"},
-            {"text": "COVID-19", "label": "Disease_disorder"}
-        ],
-        "sources": ["WHO Fact Sheet 2024", "CDC Viral Pathogen Review", "PubMed Central PMC71123"],
-        "language_processed": language
+        if language != 'en':
+            return jsonify({
+                "verdict": "Unverified",
+                "confidence": 0,
+                "explanation": "Screenshot OCR currently only supports English. Please select English, or paste the claim as text instead.",
+                "entities": [],
+                "sources": [],
+                "language_processed": language,
+            }), 422
+
+        try:
+            extracted_text = ocr_utils.extract_text_from_image(image_bytes)
+        except Exception:
+            return jsonify({
+                "verdict": "Unverified",
+                "confidence": 0,
+                "explanation": "Something went wrong reading this image. Please try a clearer screenshot or paste the claim as text.",
+                "entities": [],
+                "sources": [],
+                "language_processed": language,
+            }), 500
+
+        if not extracted_text:
+            return jsonify({
+                "verdict": "Unverified",
+                "confidence": 0,
+                "explanation": "Couldn't find any readable text in this image. Try a clearer or higher-resolution screenshot, or paste the claim as text.",
+                "entities": [],
+                "sources": [],
+                "language_processed": language,
+            }), 422
+
+        claim_text = extracted_text
+        ocr_used = True
+
+    if not claim_text:
+        return jsonify({"error": "No claim text provided."}), 400
+
+    result = verify_claim(claim_text)
+
+    # Persist to history
+    db.save_result(claim_text, result)
+
+    response = {
+        "verdict": result.get("verdict"),
+        "confidence": result.get("confidence"),
+        "explanation": result.get("explanation"),
+        "entities": result.get("entities", []),
+        "sources": result.get("sources", []),
+        "language_processed": language,
+        "ocr_used": ocr_used,
+        "claim_text_used": claim_text if ocr_used else None,
     }
-    
-    return jsonify(result)
+    return jsonify(response)
+
+
+@app.route('/api/history', methods=['GET'])
+def api_history():
+    limit = request.args.get('limit', default=20, type=int)
+    return jsonify(db.get_history(limit=limit))
+
 
 @app.route('/api/predict_spread', methods=['POST'])
 def api_predict_spread():
-    """Simulates GNN (GAT) Network Spread Risk Modeling"""
-    claim = request.json.get('claim', '')
-    
-    # Simulating structural graph risk evaluation
+    """
+    Spread Risk Modeling.
+    NOTE: the real GNN/GAT layer (Phase 6) isn't built yet -- this is a
+    clearly-labeled heuristic placeholder, not the trained model described
+    in the pitch. Swap this out once Phase 6 lands.
+    """
+    claim = (request.json or {}).get('claim', '')
+    if not claim.strip():
+        return jsonify({"error": "No claim provided."}), 400
+
     graph_data = {
         "virality_score": 87,
         "risk_level": "High Risk",
         "predicted_nodes_reached": 14200,
         "time_to_peak_hours": 12,
-        "network_hubs_vulnerable": ["WhatsApp Forwards Cluster A", "Public FB Groups"]
+        "network_hubs_vulnerable": ["WhatsApp Forwards Cluster A", "Public FB Groups"],
+        "is_simulated": True,  # tells the frontend to label this as a placeholder
     }
     return jsonify(graph_data)
 
+
+@app.route('/api/passport', methods=['GET', 'POST'])
+def api_passport():
+    if request.method == 'POST':
+        data = request.get_json(force=True) or {}
+        required_defaults = {
+            "full_name": "", "blood_group": "", "date_of_birth": "",
+            "allergies": "", "chronic_conditions": "", "current_medicines": "",
+            "emergency_contact_name": "", "emergency_contact_phone": "",
+        }
+        for key, default in required_defaults.items():
+            data.setdefault(key, default)
+        hp.save_passport(data)
+        return jsonify({"status": "saved"})
+
+    passport_data = hp.get_passport()
+    if not passport_data:
+        return jsonify(None)
+    return jsonify(passport_data)
+
+
+@app.route('/api/passport/qr', methods=['GET'])
+def api_passport_qr():
+    passport_data = hp.get_passport()
+    if not passport_data:
+        return jsonify({"error": "No passport saved yet."}), 404
+    png_bytes = hp.generate_qr_code(passport_data)
+    return Response(png_bytes, mimetype='image/png')
+
+
 if __name__ == '__main__':
-    app.run(debug=True, port=5000)
+    app.run(debug=True, port=5000, use_reloader=False)
