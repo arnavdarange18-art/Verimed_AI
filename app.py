@@ -11,8 +11,10 @@ import translate_utils
 import auth
 import pdf_export
 import sys, os
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "gnn"))
-from gnn_predict import predict_spread
+PROJECT_ROOT = os.path.dirname(__file__)
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
+from gnn.gnn_predict import predict_spread
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("FLASK_SECRET_KEY", "dev-only-change-me")

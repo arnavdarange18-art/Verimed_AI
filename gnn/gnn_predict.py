@@ -13,9 +13,14 @@ import os
 import torch
 from torch_geometric.data import Data, Batch
 
-from .graph_utils import generate_social_graph, graph_node_features, top_hub_nodes
-from .claim_features import build_claim_feature_vector
-from .model import SpreadGNN
+try:
+    from .graph_utils import generate_social_graph, graph_node_features, top_hub_nodes
+    from .claim_features import build_claim_feature_vector
+    from .model import SpreadGNN
+except ImportError:  # pragma: no cover - allows running as a plain script
+    from graph_utils import generate_social_graph, graph_node_features, top_hub_nodes
+    from claim_features import build_claim_feature_vector
+    from model import SpreadGNN
 
 _MODEL_PATH = os.path.join(os.path.dirname(__file__), "spread_gnn_weights.pt")
 _NUM_NODES = 150
