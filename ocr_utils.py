@@ -2,33 +2,44 @@
 PHASE 7: OCR module for screenshot/image claim input.
 
 Extracts text from uploaded images (e.g. WhatsApp forward screenshots) using
-EasyOCR, so claims that arrive as pictures -- not just typed text -- can be
+EasyOCR so claims that arrive as pictures -- not just typed text -- can be
 verified.
 
-NOTE ON LANGUAGE SCOPE:
-English only for now. EasyOCR requires language packs to be loaded together
-into one Reader, and not all language combinations are compatible with each
-other -- so "just add every language" isn't a one-line change. Supporting
-Hindi/Marathi screenshots properly means loading a second Reader instance for
-those languages and routing to it based on the user's language selection.
-That's flagged as follow-up work, not done here.
-
-First run downloads EasyOCR's detection + recognition models (~100MB) --
-same one-time-download pattern as the NER model in ner_utils.py.
+The OCR path now supports the same language selections as the checker UI.
 """
 
+from functools import lru_cache
 import easyocr
-
-# Load once at import time, reuse across calls (loading the reader is the
-# slow part -- don't do this per-request).
-_reader = easyocr.Reader(['en'], gpu=False)
 
 # Below this confidence, EasyOCR's guess is unreliable enough that including
 # it does more harm than good to the downstream claim text.
 MIN_CONFIDENCE = 0.4
+SUPPORTED_LANGUAGES = {"en", "hi", "mr", "es"}
 
 
-def extract_text_from_image(image_bytes: bytes) -> str:
+@lru_cache(maxsize=8)
+def _get_reader(language_code: str):
+    """Create and cache an EasyOCR reader for the requested language."""
+    normalized = (language_code or "en").lower()
+    if normalized not in SUPPORTED_LANGUAGES:
+        normalized = "en"
+
+    candidate_langs = [normalized]
+    if normalized != "en":
+        candidate_langs.append("en")
+
+    last_error = None
+    for langs in candidate_langs:
+        try:
+            return easyocr.Reader([langs], gpu=False)
+        except Exception as exc:  # pragma: no cover - depends on runtime model availability
+            last_error = exc
+
+    # Final fallback to English if the requested language pack is unavailable.
+    return easyocr.Reader(["en"], gpu=False)
+
+
+def extract_text_from_image(image_bytes: bytes, language_code: str = "en") -> str:
     """
     Runs OCR on raw image bytes and returns the concatenated recognized text,
     in reading order top-to-bottom as EasyOCR detects it.
@@ -37,9 +48,15 @@ def extract_text_from_image(image_bytes: bytes) -> str:
     confidence threshold -- callers should treat that as "OCR failed" and
     not silently pass empty text further down the pipeline.
     """
-    results = _reader.readtext(image_bytes)
+    reader = _get_reader(language_code)
+    results = reader.readtext(image_bytes)
 
     lines = [text.strip() for (_bbox, text, confidence) in results if confidence >= MIN_CONFIDENCE]
+    if not lines and language_code != "en":
+        fallback_reader = _get_reader("en")
+        fallback_results = fallback_reader.readtext(image_bytes)
+        lines = [text.strip() for (_bbox, text, confidence) in fallback_results if confidence >= MIN_CONFIDENCE]
+
     return " ".join(lines).strip()
 
 

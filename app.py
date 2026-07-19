@@ -160,18 +160,8 @@ def api_verify():
         image_file = request.files['image']
         image_bytes = image_file.read()
 
-        if language != 'en':
-            return jsonify({
-                "verdict": "Unverified",
-                "confidence": 0,
-                "explanation": "Screenshot OCR currently only supports English. Please select English, or paste the claim as text instead.",
-                "entities": [],
-                "sources": [],
-                "language_processed": language,
-            }), 422
-
         try:
-            extracted_text = ocr_utils.extract_text_from_image(image_bytes)
+            extracted_text = ocr_utils.extract_text_from_image(image_bytes, language_code=language)
         except Exception:
             return jsonify({
                 "verdict": "Unverified",
@@ -198,12 +188,11 @@ def api_verify():
     if not claim_text:
         return jsonify({"error": "No claim text provided."}), 400
 
-    # Translate non-English TEXT claims into English before running the
-    # NER/RAG/LLM pipeline (which operates in English). OCR path above is
-    # already restricted to English images, so this only applies to typed
-    # or voice-transcribed text in another language.
+    # Translate non-English input into English before running the NER/RAG/LLM
+    # pipeline (which operates in English). This now applies to both typed
+    # and OCR-extracted text.
     original_claim_text = claim_text
-    if language != "en" and not ocr_used:
+    if language != "en":
         claim_text = translate_utils.translate_to_english(claim_text, language)
 
     result = verify_claim(claim_text)
@@ -224,7 +213,7 @@ def api_verify():
         "sources": result.get("sources", []),
         "language_processed": language,
         "ocr_used": ocr_used,
-        "claim_text_used": claim_text if (ocr_used or language != "en") else None,
+        "claim_text_used": original_claim_text if (ocr_used or language != "en") else None,
     }
     return jsonify(response)
 

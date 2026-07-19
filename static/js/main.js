@@ -210,32 +210,59 @@ if (checkerForm) {
     const claimTextarea = document.getElementById("claimTextarea");
     const SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
 
+    function mapSpeechLanguage(code) {
+        const langMap = { en: "en-US", hi: "hi-IN", mr: "mr-IN", es: "es-ES" };
+        return langMap[code] || "en-US";
+    }
+
     if (voiceBtn && SpeechRecognitionAPI) {
         const recognition = new SpeechRecognitionAPI();
         recognition.continuous = false;
         recognition.interimResults = false;
+        recognition.maxAlternatives = 1;
+        let isListening = false;
+
+        const setListeningState = (listening) => {
+            isListening = listening;
+            voiceBtn.classList.toggle("text-red-600", listening);
+            voiceLabel.textContent = listening ? "Listening..." : "Speak";
+        };
 
         voiceBtn.addEventListener("click", () => {
+            if (isListening) {
+                recognition.stop();
+                return;
+            }
+
             const langSelect = checkerForm.querySelector("select[name='language']");
-            recognition.lang = langSelect ? langSelect.value : "en-US";
-            recognition.start();
-            voiceBtn.classList.add("text-red-600");
-            voiceLabel.textContent = "Listening...";
+            recognition.lang = mapSpeechLanguage(langSelect ? langSelect.value : "en");
+
+            try {
+                recognition.start();
+                setListeningState(true);
+            } catch (err) {
+                setListeningState(false);
+            }
         });
 
         recognition.addEventListener("result", (event) => {
-            const transcript = event.results[0][0].transcript;
-            claimTextarea.value = (claimTextarea.value ? claimTextarea.value + " " : "") + transcript;
+            const transcript = Array.from(event.results)
+                .map((result) => result[0]?.transcript || "")
+                .join(" ")
+                .trim();
+
+            if (transcript) {
+                claimTextarea.value = (claimTextarea.value ? `${claimTextarea.value} ${transcript}`.trim() : transcript);
+            }
         });
 
         recognition.addEventListener("end", () => {
-            voiceBtn.classList.remove("text-red-600");
-            voiceLabel.textContent = "Speak";
+            setListeningState(false);
         });
 
-        recognition.addEventListener("error", () => {
-            voiceBtn.classList.remove("text-red-600");
-            voiceLabel.textContent = "Speak";
+        recognition.addEventListener("error", (event) => {
+            console.warn("Speech recognition error:", event.error);
+            setListeningState(false);
         });
     } else if (voiceBtn) {
         // Browser doesn't support Speech Recognition (e.g. Firefox) -- hide gracefully
@@ -372,7 +399,7 @@ function renderCheckerResult(data) {
         }
 
         speakBtn.onclick = async () => {
-            if (window.speechSynthesis.speaking) {
+            if (window.speechSynthesis.speaking || window.speechSynthesis.pending) {
                 window.speechSynthesis.cancel();
                 speakLabel.textContent = "Listen";
                 return;
@@ -413,6 +440,8 @@ function renderCheckerResult(data) {
 
             utterance.onstart = () => { speakLabel.textContent = "Stop"; };
             utterance.onend = () => { speakLabel.textContent = "Listen"; };
+            utterance.onerror = () => { speakLabel.textContent = "Listen"; };
+            window.speechSynthesis.cancel();
             window.speechSynthesis.speak(utterance);
         };
     } else if (speakBtn) {
