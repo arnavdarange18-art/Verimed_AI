@@ -10,12 +10,15 @@ streamlit
 transformers
 torch
 
-# ==== PHASE 6: GNN ====
+# ==== PHASE 6: GNN + spread risk graph analysis ====
 torch-geometric
 networkx
 
 # ==== PHASE 7: OCR ====
 easyocr
+
+# ==== Translation (multilingual claims) ====
+deep-translator
 
 # ==== Data sources ====
 requests
@@ -24,9 +27,10 @@ biopython
 # ==== Health Passport (Day 4) ====
 qrcode[pil]
 
-# ==== Translation (Quick Win) ====
-deep-translator
-
 # ==== Auth + PDF Export (Login/Register feature) ====
 flask-login
 fpdf2
+
+# ==== Dev tool: building the seed dataset from real published datasets ====
+# Only needed if you re-run build_seed_dataset.py -- not required to run the app itself
+datasets

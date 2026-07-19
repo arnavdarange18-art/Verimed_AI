@@ -7,6 +7,7 @@ from verify_v2 import verify_claim
 import db
 import health_passport as hp
 import ocr_utils
+import spread_predictor
 import translate_utils
 import auth
 import pdf_export
@@ -15,6 +16,7 @@ PROJECT_ROOT = os.path.dirname(__file__)
 if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 from gnn.gnn_predict import predict_spread
+print("✅ VERIMED GNN MODULE LOADED SUCCESSFULLY — v2")
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("FLASK_SECRET_KEY", "dev-only-change-me")
@@ -242,20 +244,23 @@ def api_trending():
 @app.route('/api/predict_spread', methods=['POST'])
 def api_predict_spread():
     """
-    Spread Risk Modeling -- now powered by a real trained Graph Attention
-    Network (Phase 6). See gnn/ for the model, training script, and
-    inference code. Falls back to a labeled heuristic if the model can't
-    load or inference fails, so this endpoint never hard-crashes.
+    Spread Risk Estimation.
+    Primary path: a real trained Graph Attention Network (Phase 6). See
+    gnn/ for the model, training script, and inference code.
+    Fallback path: if the trained model can't load or inference throws for
+    any reason, we fall back to spread_predictor.py's explainable heuristic
+    scorer (real graph-centrality + knowledge-base-similarity signals, not
+    a placeholder) so this endpoint never hard-crashes and never silently
+    returns nothing.
     """
-    claim = (request.json or {}).get('claim', '')
-    if not claim.strip():
+    claim = (request.json or {}).get('claim', '').strip()
+    if not claim:
         return jsonify({"error": "No claim provided."}), 400
 
     # Run the same verification pipeline used by /api/verify so the GNN's
     # risk features (verdict, confidence, entities) are grounded in real
     # evidence, not guessed independently.
     verification = verify_claim(claim)
-
     graph_data = predict_spread(
         claim_text=claim,
         verdict=verification.get("verdict", "Unverified"),

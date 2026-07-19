@@ -27,8 +27,14 @@ DB_FILE = "verimed.db"
 UPLOAD_DIR = "uploads/medical_reports"
 
 
-def init_passport_table():
+def _connect():
     conn = sqlite3.connect(DB_FILE)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+
+def init_passport_table():
+    conn = _connect()
     cur = conn.cursor()
 
     cur.execute("""
@@ -43,10 +49,20 @@ def init_passport_table():
             current_medicines TEXT,
             emergency_contact_name TEXT,
             emergency_contact_phone TEXT,
-            share_token TEXT UNIQUE,
+            share_token TEXT,
             updated_at TEXT
         )
     """)
+
+    # Backward-compatible schema upgrade for older databases.
+    for column_name in ["user_id", "share_token", "updated_at"]:
+        try:
+            cur.execute(f"SELECT {column_name} FROM health_passport LIMIT 1")
+        except sqlite3.OperationalError:
+            if column_name == "user_id":
+                cur.execute("ALTER TABLE health_passport ADD COLUMN user_id INTEGER")
+            else:
+                cur.execute(f"ALTER TABLE health_passport ADD COLUMN {column_name} TEXT")
 
     cur.execute("""
         CREATE TABLE IF NOT EXISTS surgeries (
@@ -92,7 +108,7 @@ def init_passport_table():
 # ---------------------------------------------------------------------------
 
 def save_passport(user_id: int, data: dict):
-    conn = sqlite3.connect(DB_FILE)
+    conn = _connect()
     cur = conn.cursor()
     cur.execute("SELECT id, share_token FROM health_passport WHERE user_id = ?", (user_id,))
     existing = cur.fetchone()
@@ -128,8 +144,7 @@ def save_passport(user_id: int, data: dict):
 
 
 def get_passport(user_id: int) -> dict | None:
-    conn = sqlite3.connect(DB_FILE)
-    conn.row_factory = sqlite3.Row
+    conn = _connect()
     cur = conn.cursor()
     cur.execute("SELECT * FROM health_passport WHERE user_id = ?", (user_id,))
     row = cur.fetchone()
@@ -139,8 +154,7 @@ def get_passport(user_id: int) -> dict | None:
 
 def get_passport_by_token(share_token: str) -> dict | None:
     """Used by the public /emergency/<token> view -- no auth required."""
-    conn = sqlite3.connect(DB_FILE)
-    conn.row_factory = sqlite3.Row
+    conn = _connect()
     cur = conn.cursor()
     cur.execute("SELECT * FROM health_passport WHERE share_token = ?", (share_token,))
     row = cur.fetchone()
@@ -153,7 +167,7 @@ def get_passport_by_token(share_token: str) -> dict | None:
 # ---------------------------------------------------------------------------
 
 def add_surgery(user_id: int, year: str, description: str):
-    conn = sqlite3.connect(DB_FILE)
+    conn = _connect()
     cur = conn.cursor()
     cur.execute(
         "INSERT INTO surgeries (user_id, year, description, created_at) VALUES (?, ?, ?, ?)",
@@ -164,8 +178,7 @@ def add_surgery(user_id: int, year: str, description: str):
 
 
 def get_surgeries(user_id: int) -> list[dict]:
-    conn = sqlite3.connect(DB_FILE)
-    conn.row_factory = sqlite3.Row
+    conn = _connect()
     cur = conn.cursor()
     cur.execute("SELECT * FROM surgeries WHERE user_id = ? ORDER BY year DESC", (user_id,))
     rows = [dict(r) for r in cur.fetchall()]
@@ -174,7 +187,7 @@ def get_surgeries(user_id: int) -> list[dict]:
 
 
 def delete_surgery(user_id: int, surgery_id: int):
-    conn = sqlite3.connect(DB_FILE)
+    conn = _connect()
     cur = conn.cursor()
     cur.execute("DELETE FROM surgeries WHERE id = ? AND user_id = ?", (surgery_id, user_id))
     conn.commit()
@@ -186,7 +199,7 @@ def delete_surgery(user_id: int, surgery_id: int):
 # ---------------------------------------------------------------------------
 
 def add_vaccination(user_id: int, vaccine_name: str, month: str, year: str):
-    conn = sqlite3.connect(DB_FILE)
+    conn = _connect()
     cur = conn.cursor()
     cur.execute(
         "INSERT INTO vaccinations (user_id, vaccine_name, month, year, created_at) VALUES (?, ?, ?, ?, ?)",
@@ -197,8 +210,7 @@ def add_vaccination(user_id: int, vaccine_name: str, month: str, year: str):
 
 
 def get_vaccinations(user_id: int) -> list[dict]:
-    conn = sqlite3.connect(DB_FILE)
-    conn.row_factory = sqlite3.Row
+    conn = _connect()
     cur = conn.cursor()
     cur.execute("SELECT * FROM vaccinations WHERE user_id = ? ORDER BY year DESC", (user_id,))
     rows = [dict(r) for r in cur.fetchall()]
@@ -207,7 +219,7 @@ def get_vaccinations(user_id: int) -> list[dict]:
 
 
 def delete_vaccination(user_id: int, vaccination_id: int):
-    conn = sqlite3.connect(DB_FILE)
+    conn = _connect()
     cur = conn.cursor()
     cur.execute("DELETE FROM vaccinations WHERE id = ? AND user_id = ?", (vaccination_id, user_id))
     conn.commit()
@@ -231,7 +243,7 @@ def save_report_file(user_id: int, file_storage, category: str, month: str, year
     stored_path = os.path.join(user_folder, safe_name)
     file_storage.save(stored_path)
 
-    conn = sqlite3.connect(DB_FILE)
+    conn = _connect()
     cur = conn.cursor()
     cur.execute("""
         INSERT INTO medical_reports (user_id, filename, stored_path, category, month, year, uploaded_at)
@@ -251,8 +263,7 @@ def save_report_file(user_id: int, file_storage, category: str, month: str, year
 
 
 def get_reports(user_id: int) -> list[dict]:
-    conn = sqlite3.connect(DB_FILE)
-    conn.row_factory = sqlite3.Row
+    conn = _connect()
     cur = conn.cursor()
     cur.execute(
         "SELECT * FROM medical_reports WHERE user_id = ? ORDER BY year DESC, month DESC",
@@ -264,8 +275,7 @@ def get_reports(user_id: int) -> list[dict]:
 
 
 def get_report_by_id(user_id: int, report_id: int) -> dict | None:
-    conn = sqlite3.connect(DB_FILE)
-    conn.row_factory = sqlite3.Row
+    conn = _connect()
     cur = conn.cursor()
     cur.execute("SELECT * FROM medical_reports WHERE id = ? AND user_id = ?", (report_id, user_id))
     row = cur.fetchone()
@@ -278,7 +288,7 @@ def delete_report(user_id: int, report_id: int):
     if report and os.path.exists(report["stored_path"]):
         os.remove(report["stored_path"])
 
-    conn = sqlite3.connect(DB_FILE)
+    conn = _connect()
     cur = conn.cursor()
     cur.execute("DELETE FROM medical_reports WHERE id = ? AND user_id = ?", (report_id, user_id))
     conn.commit()
