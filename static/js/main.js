@@ -170,12 +170,80 @@ function renderCheckerResult(data) {
     const speakBtn = document.getElementById("speakResultBtn");
     const speakLabel = document.getElementById("speakResultLabel");
     if (speakBtn && "speechSynthesis" in window) {
-        speakBtn.onclick = () => {
-            window.speechSynthesis.cancel(); // stop any previous playback
+        const SPEECH_LANG_MAP = {
+            en: "en-US",
+            hi: "hi-IN",
+            mr: "mr-IN",
+            es: "es-ES",
+        };
+
+        let speakNote = document.getElementById("speakVoiceNote");
+        if (!speakNote && speakBtn.parentElement) {
+            speakNote = document.createElement("div");
+            speakNote.id = "speakVoiceNote";
+            speakNote.className = "text-[10px] text-slate-400 mt-1 hidden";
+            speakBtn.parentElement.appendChild(speakNote);
+        }
+
+        // Chrome loads its voice list asynchronously. Calling
+        // getVoices() too early (e.g. the first time it's ever called on
+        // a page) can return an empty array even though voices exist --
+        // this waits for the real list instead of assuming it's ready.
+        function loadVoicesOnce() {
+            return new Promise((resolve) => {
+                const existing = window.speechSynthesis.getVoices();
+                if (existing.length > 0) {
+                    resolve(existing);
+                    return;
+                }
+                window.speechSynthesis.onvoiceschanged = () => {
+                    resolve(window.speechSynthesis.getVoices());
+                };
+                // Safety timeout in case the event never fires on some browsers
+                setTimeout(() => resolve(window.speechSynthesis.getVoices()), 1000);
+            });
+        }
+
+        speakBtn.onclick = async () => {
+            if (window.speechSynthesis.speaking) {
+                window.speechSynthesis.cancel();
+                speakLabel.textContent = "Listen";
+                return;
+            }
+
+            const availableVoices = await loadVoicesOnce();
+
             const utterance = new SpeechSynthesisUtterance(
                 `Verdict: ${data.verdict}. ${data.explanation || ""}`
             );
             utterance.rate = 0.95;
+
+            const targetLangCode = SPEECH_LANG_MAP[data.language_processed] || "en-US";
+            let chosenVoice = availableVoices.find(v => v.lang === targetLangCode);
+
+            if (!chosenVoice && data.language_processed === "mr") {
+                chosenVoice = availableVoices.find(v => v.lang === "hi-IN");
+            }
+
+            if (chosenVoice) {
+                utterance.voice = chosenVoice;
+                utterance.lang = chosenVoice.lang;
+            } else {
+                utterance.lang = "en-US";
+            }
+
+            if (speakNote) {
+                if (!chosenVoice) {
+                    speakNote.textContent = `No voice available for this language on your device -- using default.`;
+                    speakNote.classList.remove("hidden");
+                } else if (chosenVoice.lang !== targetLangCode) {
+                    speakNote.textContent = `No Marathi voice found on this device -- using the closest available (Hindi) voice instead.`;
+                    speakNote.classList.remove("hidden");
+                } else {
+                    speakNote.classList.add("hidden");
+                }
+            }
+
             utterance.onstart = () => { speakLabel.textContent = "Stop"; };
             utterance.onend = () => { speakLabel.textContent = "Listen"; };
             window.speechSynthesis.speak(utterance);
