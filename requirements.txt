@@ -29,3 +29,7 @@ qrcode[pil]
 # ==== Translation (Quick Win) ====
 deep-translator
  
+# ==== Auth + PDF Export (Login/Register feature) ====
+flask-login
+fpdf2
+ 

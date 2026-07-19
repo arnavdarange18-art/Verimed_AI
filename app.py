@@ -1,20 +1,37 @@
-from flask import Flask, render_template, request, jsonify, Response
+from flask import Flask, render_template, request, jsonify, Response, redirect, url_for, flash, send_file
 import os
+
+from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 
 from verify_v2 import verify_claim
 import db
 import health_passport as hp
 import ocr_utils
 import translate_utils
-from gnn.gnn_predict import predict_spread
-print("✅ VERIMED GNN MODULE LOADED SUCCESSFULLY — v2")
+import auth
+import pdf_export
+import sys, os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "gnn"))
+from gnn_predict import predict_spread
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("FLASK_SECRET_KEY", "dev-only-change-me")
 
+login_manager = LoginManager()
+login_manager.init_app(app)
+login_manager.login_view = "login"
+login_manager.login_message = "Please log in to access your Health Passport."
+
+
+@login_manager.user_loader
+def load_user(user_id):
+    return auth.get_user_by_id(user_id)
+
+
 # Make sure tables exist before anything else runs
 db.init_db()
 hp.init_passport_table()
+auth.init_users_table()
 
 # --- PAGE ROUTING ---
 
@@ -39,8 +56,91 @@ def predictor():
     return render_template('predictor.html')
 
 @app.route('/passport')
+@login_required
 def passport():
-    return render_template('passport.html')
+    return render_template('passport.html', user=current_user)
+
+
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    if current_user.is_authenticated:
+        return redirect(url_for('passport'))
+
+    if request.method == 'POST':
+        name = request.form.get('name', '').strip()
+        email = request.form.get('email', '').strip()
+        password = request.form.get('password', '')
+        confirm_password = request.form.get('confirm_password', '')
+
+        if not name or not email or not password:
+            flash("Please fill in all fields.", "error")
+            return render_template('register.html')
+
+        if password != confirm_password:
+            flash("Passwords do not match.", "error")
+            return render_template('register.html')
+
+        if len(password) < 8:
+            flash("Password must be at least 8 characters.", "error")
+            return render_template('register.html')
+
+        user = auth.create_user(name, email, password)
+        if user is None:
+            flash("An account with that email already exists. Try logging in instead.", "error")
+            return render_template('register.html')
+
+        login_user(user)
+        return redirect(url_for('passport'))
+
+    return render_template('register.html')
+
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if current_user.is_authenticated:
+        return redirect(url_for('passport'))
+
+    if request.method == 'POST':
+        email = request.form.get('email', '').strip()
+        password = request.form.get('password', '')
+
+        user = auth.verify_login(email, password)
+        if user is None:
+            flash("Incorrect email or password.", "error")
+            return render_template('login.html')
+
+        login_user(user)
+        next_page = request.args.get('next')
+        return redirect(next_page or url_for('passport'))
+
+    return render_template('login.html')
+
+
+@app.route('/logout')
+@login_required
+def logout():
+    logout_user()
+    return redirect(url_for('home'))
+
+
+@app.route('/emergency-help')
+def emergency_help():
+    return render_template('emergency_help.html')
+
+
+@app.route('/emergency/<share_token>')
+def emergency_view(share_token):
+    """
+    Public, read-only emergency view -- this is what the QR code opens.
+    No login required, intentionally shows only emergency-relevant fields.
+    """
+    passport_data = hp.get_passport_by_token(share_token)
+    if not passport_data:
+        return render_template('emergency_view.html', passport=None), 404
+
+    surgeries = hp.get_surgeries(passport_data['user_id'])
+    vaccinations = hp.get_vaccinations(passport_data['user_id'])
+    return render_template('emergency_view.html', passport=passport_data, surgeries=surgeries, vaccinations=vaccinations)
 
 # --- API ENDPOINTS ---
 
@@ -153,6 +253,7 @@ def api_predict_spread():
     # risk features (verdict, confidence, entities) are grounded in real
     # evidence, not guessed independently.
     verification = verify_claim(claim)
+
     graph_data = predict_spread(
         claim_text=claim,
         verdict=verification.get("verdict", "Unverified"),
@@ -163,6 +264,7 @@ def api_predict_spread():
 
 
 @app.route('/api/passport', methods=['GET', 'POST'])
+@login_required
 def api_passport():
     if request.method == 'POST':
         data = request.get_json(force=True) or {}
@@ -173,22 +275,109 @@ def api_passport():
         }
         for key, default in required_defaults.items():
             data.setdefault(key, default)
-        hp.save_passport(data)
+        hp.save_passport(int(current_user.id), data)
         return jsonify({"status": "saved"})
 
-    passport_data = hp.get_passport()
+    passport_data = hp.get_passport(int(current_user.id))
     if not passport_data:
         return jsonify(None)
     return jsonify(passport_data)
 
 
 @app.route('/api/passport/qr', methods=['GET'])
+@login_required
 def api_passport_qr():
-    passport_data = hp.get_passport()
+    passport_data = hp.get_passport(int(current_user.id))
     if not passport_data:
         return jsonify({"error": "No passport saved yet."}), 404
-    png_bytes = hp.generate_qr_code(passport_data)
+    png_bytes = hp.generate_qr_code(passport_data['share_token'], request.host_url)
     return Response(png_bytes, mimetype='image/png')
+
+
+@app.route('/api/passport/surgeries', methods=['GET', 'POST'])
+@login_required
+def api_surgeries():
+    if request.method == 'POST':
+        data = request.get_json(force=True) or {}
+        hp.add_surgery(int(current_user.id), data.get('year', ''), data.get('description', ''))
+        return jsonify({"status": "added"})
+    return jsonify(hp.get_surgeries(int(current_user.id)))
+
+
+@app.route('/api/passport/surgeries/<int:surgery_id>', methods=['DELETE'])
+@login_required
+def api_delete_surgery(surgery_id):
+    hp.delete_surgery(int(current_user.id), surgery_id)
+    return jsonify({"status": "deleted"})
+
+
+@app.route('/api/passport/vaccinations', methods=['GET', 'POST'])
+@login_required
+def api_vaccinations():
+    if request.method == 'POST':
+        data = request.get_json(force=True) or {}
+        hp.add_vaccination(int(current_user.id), data.get('vaccine_name', ''), data.get('month', ''), data.get('year', ''))
+        return jsonify({"status": "added"})
+    return jsonify(hp.get_vaccinations(int(current_user.id)))
+
+
+@app.route('/api/passport/vaccinations/<int:vaccination_id>', methods=['DELETE'])
+@login_required
+def api_delete_vaccination(vaccination_id):
+    hp.delete_vaccination(int(current_user.id), vaccination_id)
+    return jsonify({"status": "deleted"})
+
+
+@app.route('/api/passport/reports', methods=['GET', 'POST'])
+@login_required
+def api_reports():
+    if request.method == 'POST':
+        if 'file' not in request.files or request.files['file'].filename == '':
+            return jsonify({"error": "No file provided."}), 400
+        file_storage = request.files['file']
+        category = request.form.get('category', 'Other')
+        month = request.form.get('month', '')
+        year = request.form.get('year', '')
+        report = hp.save_report_file(int(current_user.id), file_storage, category, month, year)
+        return jsonify(report)
+
+    return jsonify(hp.get_reports(int(current_user.id)))
+
+
+@app.route('/api/passport/reports/<int:report_id>', methods=['DELETE'])
+@login_required
+def api_delete_report(report_id):
+    hp.delete_report(int(current_user.id), report_id)
+    return jsonify({"status": "deleted"})
+
+
+@app.route('/api/passport/reports/<int:report_id>/download', methods=['GET'])
+@login_required
+def api_download_report(report_id):
+    report = hp.get_report_by_id(int(current_user.id), report_id)
+    if not report or not os.path.exists(report['stored_path']):
+        return jsonify({"error": "Report not found."}), 404
+    return send_file(report['stored_path'], as_attachment=True, download_name=report['filename'])
+
+
+@app.route('/api/passport/pdf', methods=['GET'])
+@login_required
+def api_passport_pdf():
+    passport_data = hp.get_passport(int(current_user.id))
+    if not passport_data:
+        return jsonify({"error": "No passport saved yet."}), 404
+
+    surgeries = hp.get_surgeries(int(current_user.id))
+    vaccinations = hp.get_vaccinations(int(current_user.id))
+    qr_bytes = hp.generate_qr_code(passport_data['share_token'], request.host_url)
+
+    pdf_bytes = pdf_export.generate_passport_pdf(passport_data, surgeries, vaccinations, qr_bytes)
+
+    return Response(
+        pdf_bytes,
+        mimetype='application/pdf',
+        headers={"Content-Disposition": "attachment; filename=VeriMed_Health_Passport.pdf"},
+    )
 
 
 if __name__ == '__main__':

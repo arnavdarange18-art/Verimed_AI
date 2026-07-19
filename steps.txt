@@ -59,3 +59,7 @@ pip install deep-translator
 ____________________--
 gnn
 pip install torch-geometric networkx
+
+_____________________________________________________________________________________________________________________________________________________
+passport page
+pip install flask-login fpdf2

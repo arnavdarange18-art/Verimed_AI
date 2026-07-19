@@ -28,8 +28,30 @@
             <a href="/checker" class="hover:text-blue-600 transition-colors"><i class="fa-solid fa-magnifying-glass-shield mr-1"></i> AI Fact Checker</a>
             <a href="/predictor" class="hover:text-blue-600 transition-colors"><i class="fa-solid fa-diagram-project mr-1"></i> GNN Predictor</a>
             <a href="/passport" class="hover:text-blue-600 transition-colors"><i class="fa-solid fa-id-card-clip mr-1"></i> Health Passport</a>
+            <a href="/emergency-help" class="text-red-500 hover:text-red-700 transition-colors font-bold"><i class="fa-solid fa-truck-medical mr-1"></i> Emergency</a>
+            {% if current_user.is_authenticated %}
+                <span class="text-slate-400">|</span>
+                <span class="text-slate-500"><i class="fa-solid fa-circle-user mr-1"></i>{{ current_user.name }}</span>
+                <a href="/logout" class="text-red-500 hover:text-red-700 transition-colors"><i class="fa-solid fa-right-from-bracket mr-1"></i>Logout</a>
+            {% else %}
+                <span class="text-slate-400">|</span>
+                <a href="/login" class="hover:text-blue-600 transition-colors">Login</a>
+                <a href="/register" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors">Register</a>
+            {% endif %}
         </div>
     </nav>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+        <div class="max-w-7xl w-full mx-auto px-6 pt-4">
+            {% for category, message in messages %}
+            <div class="p-3 rounded-xl text-sm font-semibold mb-2 {{ 'bg-red-50 text-red-700 border border-red-200' if category == 'error' else 'bg-emerald-50 text-emerald-700 border border-emerald-200' }}">
+                {{ message }}
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+    {% endwith %}
 
     <!-- Main Dynamic Content Wrapper -->
     <main class="flex-1 max-w-7xl w-full mx-auto p-6">

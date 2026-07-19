@@ -16,10 +16,166 @@ function verdictColorClasses(verdict) {
     }
 }
 
-function escapeHtml(str) {
-    const div = document.createElement("div");
-    div.textContent = str == null ? "" : String(str);
-    return div.innerHTML;
+// ---------- Emergency Help page ----------
+
+const useGpsBtn = document.getElementById("useGpsBtn");
+if (useGpsBtn) {
+    const manualSearchBtn = document.getElementById("manualSearchBtn");
+    const manualLocationInput = document.getElementById("manualLocationInput");
+    const hospitalStatus = document.getElementById("hospitalStatus");
+    const hospitalList = document.getElementById("hospitalList");
+
+    function setStatus(message, isError = false) {
+        hospitalStatus.textContent = message;
+        hospitalStatus.className = isError
+            ? "text-sm text-red-500 text-center py-6"
+            : "text-sm text-slate-400 text-center py-6";
+    }
+
+    function haversineDistanceKm(lat1, lon1, lat2, lon2) {
+        const R = 6371;
+        const dLat = ((lat2 - lat1) * Math.PI) / 180;
+        const dLon = ((lon2 - lon1) * Math.PI) / 180;
+        const a =
+            Math.sin(dLat / 2) ** 2 +
+            Math.cos((lat1 * Math.PI) / 180) *
+                Math.cos((lat2 * Math.PI) / 180) *
+                Math.sin(dLon / 2) ** 2;
+        return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    }
+
+    function buildAddress(tags) {
+        const parts = [
+            tags["addr:housenumber"],
+            tags["addr:street"],
+            tags["addr:suburb"],
+            tags["addr:city"],
+            tags["addr:postcode"],
+        ].filter(Boolean);
+        return parts.length ? parts.join(", ") : "Address not available";
+    }
+
+    async function fetchNearbyHospitals(lat, lon) {
+        hospitalList.innerHTML = "";
+        setStatus("Searching for hospitals and clinics nearby...");
+
+        // Overpass API (OpenStreetMap) -- free, no API key required
+        const query = `
+            [out:json][timeout:25];
+            (
+              node["amenity"="hospital"](around:6000,${lat},${lon});
+              way["amenity"="hospital"](around:6000,${lat},${lon});
+              node["amenity"="clinic"](around:6000,${lat},${lon});
+              way["amenity"="clinic"](around:6000,${lat},${lon});
+            );
+            out center 40;
+        `;
+
+        try {
+            const res = await fetch("https://overpass-api.de/api/interpreter", {
+                method: "POST",
+                body: "data=" + encodeURIComponent(query),
+            });
+            if (!res.ok) throw new Error("Overpass API request failed.");
+            const data = await res.json();
+
+            const results = (data.elements || [])
+                .filter((el) => el.tags && el.tags.name)
+                .map((el) => {
+                    const elLat = el.lat || (el.center && el.center.lat);
+                    const elLon = el.lon || (el.center && el.center.lon);
+                    return {
+                        name: el.tags.name,
+                        type: el.tags.amenity === "hospital" ? "Hospital" : "Clinic",
+                        address: buildAddress(el.tags),
+                        phone: el.tags.phone || el.tags["contact:phone"] || null,
+                        lat: elLat,
+                        lon: elLon,
+                        distanceKm: elLat && elLon ? haversineDistanceKm(lat, lon, elLat, elLon) : null,
+                    };
+                })
+                .filter((h) => h.lat && h.lon)
+                .sort((a, b) => (a.distanceKm ?? 999) - (b.distanceKm ?? 999))
+                .slice(0, 20);
+
+            if (results.length === 0) {
+                setStatus("No hospitals found nearby. Try a different location.", true);
+                return;
+            }
+
+            setStatus(`Found ${results.length} hospitals/clinics nearby, sorted by distance.`);
+            renderHospitalList(results);
+        } catch (err) {
+            setStatus("Couldn't fetch nearby hospitals. Please try again.", true);
+        }
+    }
+
+    function renderHospitalList(hospitals) {
+        hospitalList.innerHTML = hospitals
+            .map((h) => {
+                const directionsUrl = `https://www.google.com/maps/dir/?api=1&destination=${h.lat},${h.lon}`;
+                const distanceLabel = h.distanceKm !== null ? `${h.distanceKm.toFixed(1)} km away` : "";
+                return `
+                <div class="bg-slate-50 border border-slate-100 rounded-2xl p-4">
+                    <div class="flex items-start justify-between gap-2">
+                        <div>
+                            <h4 class="font-bold text-slate-800">${escapeHtml(h.name)}</h4>
+                            <span class="inline-block text-[10px] font-bold uppercase tracking-wide text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full mt-1">${escapeHtml(h.type)}</span>
+                            ${distanceLabel ? `<span class="text-xs text-slate-400 ml-2">${distanceLabel}</span>` : ""}
+                        </div>
+                    </div>
+                    <p class="text-xs text-slate-500 mt-2">${escapeHtml(h.address)}</p>
+                    <div class="flex gap-2 mt-3">
+                        ${h.phone ? `<a href="tel:${escapeHtml(h.phone)}" class="flex-1 text-center bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold py-2 rounded-lg transition-colors"><i class="fa-solid fa-phone mr-1"></i>Call</a>` : ""}
+                        <a href="${directionsUrl}" target="_blank" class="flex-1 text-center bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold py-2 rounded-lg transition-colors"><i class="fa-solid fa-location-arrow mr-1"></i>Directions</a>
+                    </div>
+                </div>`;
+            })
+            .join("");
+    }
+
+    useGpsBtn.addEventListener("click", () => {
+        if (!navigator.geolocation) {
+            setStatus("Your browser doesn't support GPS location.", true);
+            return;
+        }
+        setStatus("Requesting your location...");
+        navigator.geolocation.getCurrentPosition(
+            (position) => {
+                fetchNearbyHospitals(position.coords.latitude, position.coords.longitude);
+            },
+            () => {
+                setStatus("Location access denied. Try typing a location manually instead.", true);
+            }
+        );
+    });
+
+    async function searchManualLocation() {
+        const query = manualLocationInput.value.trim();
+        if (!query) return;
+
+        setStatus(`Looking up "${query}"...`);
+        try {
+            // Nominatim (OpenStreetMap) geocoding -- free, no API key required
+            const res = await fetch(
+                `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(query)}`
+            );
+            const results = await res.json();
+            if (!results || results.length === 0) {
+                setStatus(`Couldn't find "${query}". Try a more specific location.`, true);
+                return;
+            }
+            const { lat, lon } = results[0];
+            fetchNearbyHospitals(parseFloat(lat), parseFloat(lon));
+        } catch (err) {
+            setStatus("Location search failed. Please try again.", true);
+        }
+    }
+
+    manualSearchBtn.addEventListener("click", searchManualLocation);
+    manualLocationInput.addEventListener("keypress", (e) => {
+        if (e.key === "Enter") searchManualLocation();
+    });
 }
 
 // ---------- Checker page ----------
@@ -259,7 +415,9 @@ if (passportForm) {
             if (!data) return;
             document.getElementById("passName").value = data.full_name || "";
             document.getElementById("passBlood").value = data.blood_group || "";
+            document.getElementById("passDob").value = data.date_of_birth || "";
             document.getElementById("passAllergies").value = data.allergies || "";
+            document.getElementById("passChronic").value = data.chronic_conditions || "";
             document.getElementById("passMeds").value = data.current_medicines || "";
             document.getElementById("passContact").value = data.emergency_contact_name || "";
             document.getElementById("passPhone").value = data.emergency_contact_phone || "";
@@ -273,9 +431,9 @@ if (passportForm) {
         const payload = {
             full_name: document.getElementById("passName").value,
             blood_group: document.getElementById("passBlood").value,
-            date_of_birth: "",
+            date_of_birth: document.getElementById("passDob").value,
             allergies: document.getElementById("passAllergies").value,
-            chronic_conditions: "",
+            chronic_conditions: document.getElementById("passChronic").value,
             current_medicines: document.getElementById("passMeds").value,
             emergency_contact_name: document.getElementById("passContact").value,
             emergency_contact_phone: document.getElementById("passPhone").value,
@@ -308,6 +466,152 @@ function showQrCode() {
     if (!qrContainer) return;
     // Cache-bust so the browser doesn't show a stale QR after an update
     qrContainer.innerHTML = `<img src="/api/passport/qr?t=${Date.now()}" alt="Health Passport QR Code" class="w-40 h-40 object-contain" />`;
+}
+
+// ---------- Surgeries ----------
+
+const surgeryForm = document.getElementById("surgeryForm");
+if (surgeryForm) {
+    function loadSurgeries() {
+        fetch("/api/passport/surgeries")
+            .then((res) => res.json())
+            .then((surgeries) => {
+                const list = document.getElementById("surgeryList");
+                if (!surgeries || surgeries.length === 0) {
+                    list.innerHTML = `<p class="text-xs text-slate-400 text-center py-3">No surgeries recorded yet.</p>`;
+                    return;
+                }
+                list.innerHTML = surgeries.map((s) => `
+                    <div class="flex items-center justify-between bg-slate-50 border border-slate-100 rounded-xl p-3">
+                        <div><span class="font-bold text-sm text-slate-700">${escapeHtml(s.year)}</span> <span class="text-sm text-slate-500">-- ${escapeHtml(s.description)}</span></div>
+                        <button onclick="deleteSurgery(${s.id})" class="text-red-400 hover:text-red-600 text-xs"><i class="fa-solid fa-trash"></i></button>
+                    </div>`).join("");
+            });
+    }
+
+    surgeryForm.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const year = document.getElementById("surgeryYear").value;
+        const description = document.getElementById("surgeryDescription").value;
+        await fetch("/api/passport/surgeries", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ year, description }),
+        });
+        surgeryForm.reset();
+        loadSurgeries();
+    });
+
+    window.deleteSurgery = async (id) => {
+        await fetch(`/api/passport/surgeries/${id}`, { method: "DELETE" });
+        loadSurgeries();
+    };
+
+    loadSurgeries();
+}
+
+// ---------- Vaccinations ----------
+
+const vaccinationForm = document.getElementById("vaccinationForm");
+if (vaccinationForm) {
+    function loadVaccinations() {
+        fetch("/api/passport/vaccinations")
+            .then((res) => res.json())
+            .then((vaccinations) => {
+                const list = document.getElementById("vaccinationList");
+                if (!vaccinations || vaccinations.length === 0) {
+                    list.innerHTML = `<p class="text-xs text-slate-400 text-center py-3">No vaccinations recorded yet.</p>`;
+                    return;
+                }
+                list.innerHTML = vaccinations.map((v) => `
+                    <div class="flex items-center justify-between bg-slate-50 border border-slate-100 rounded-xl p-3">
+                        <div><span class="font-bold text-sm text-slate-700">${escapeHtml(v.month)} ${escapeHtml(v.year)}</span> <span class="text-sm text-slate-500">-- ${escapeHtml(v.vaccine_name)}</span></div>
+                        <button onclick="deleteVaccination(${v.id})" class="text-red-400 hover:text-red-600 text-xs"><i class="fa-solid fa-trash"></i></button>
+                    </div>`).join("");
+            });
+    }
+
+    vaccinationForm.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const vaccine_name = document.getElementById("vaccineName").value;
+        const month = document.getElementById("vaccineMonth").value;
+        const year = document.getElementById("vaccineYear").value;
+        await fetch("/api/passport/vaccinations", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ vaccine_name, month, year }),
+        });
+        vaccinationForm.reset();
+        loadVaccinations();
+    });
+
+    window.deleteVaccination = async (id) => {
+        await fetch(`/api/passport/vaccinations/${id}`, { method: "DELETE" });
+        loadVaccinations();
+    };
+
+    loadVaccinations();
+}
+
+// ---------- Medical Report Uploads ----------
+
+const reportForm = document.getElementById("reportForm");
+if (reportForm) {
+    function loadReports() {
+        fetch("/api/passport/reports")
+            .then((res) => res.json())
+            .then((reports) => {
+                const list = document.getElementById("reportList");
+                if (!reports || reports.length === 0) {
+                    list.innerHTML = `<p class="text-xs text-slate-400 text-center py-3">No reports uploaded yet.</p>`;
+                    return;
+                }
+                list.innerHTML = reports.map((r) => `
+                    <div class="flex items-center justify-between bg-slate-50 border border-slate-100 rounded-xl p-3">
+                        <div>
+                            <span class="font-bold text-sm text-slate-700">${escapeHtml(r.category)}</span>
+                            <span class="text-xs text-slate-400 ml-2">${escapeHtml(r.month)} ${escapeHtml(r.year)}</span>
+                            <div class="text-xs text-slate-500">${escapeHtml(r.filename)}</div>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <a href="/api/passport/reports/${r.id}/download" class="text-blue-500 hover:text-blue-700 text-xs"><i class="fa-solid fa-download"></i></a>
+                            <button onclick="deleteReport(${r.id})" class="text-red-400 hover:text-red-600 text-xs"><i class="fa-solid fa-trash"></i></button>
+                        </div>
+                    </div>`).join("");
+            });
+    }
+
+    reportForm.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const fileInput = document.getElementById("reportFile");
+        if (!fileInput.files.length) return;
+
+        const formData = new FormData();
+        formData.append("file", fileInput.files[0]);
+        formData.append("category", document.getElementById("reportCategory").value);
+        formData.append("month", document.getElementById("reportMonth").value);
+        formData.append("year", document.getElementById("reportYear").value);
+
+        const submitBtn = reportForm.querySelector("button[type='submit']");
+        submitBtn.disabled = true;
+        submitBtn.textContent = "Uploading...";
+
+        try {
+            await fetch("/api/passport/reports", { method: "POST", body: formData });
+            reportForm.reset();
+            loadReports();
+        } finally {
+            submitBtn.disabled = false;
+            submitBtn.textContent = "Upload Report";
+        }
+    });
+
+    window.deleteReport = async (id) => {
+        await fetch(`/api/passport/reports/${id}`, { method: "DELETE" });
+        loadReports();
+    };
+
+    loadReports();
 }
 
 // ---------- Home page: Personalized Snapshot ----------
@@ -399,4 +703,13 @@ if (latestAlertsContainer) {
         .catch(() => {
             latestAlertsContainer.innerHTML = `<div class="md:col-span-3 text-center text-red-400 text-sm py-6">Couldn't load recent alerts.</div>`;
         });
+}
+
+function escapeHtml(str) {
+    if (str === null || str === undefined) return "";
+    return String(str)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
 }
