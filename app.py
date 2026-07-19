@@ -5,9 +5,11 @@ from verify_v2 import verify_claim
 import db
 import health_passport as hp
 import ocr_utils
+import spread_predictor
 import translate_utils
 from gnn.gnn_predict import predict_spread
-print("✅ VERIMED GNN MODULE LOADED SUCCESSFULLY — v2")
+from ner_utils import extract_entities
+from retrieval import retrieve_evidence
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("FLASK_SECRET_KEY", "dev-only-change-me")
@@ -140,26 +142,41 @@ def api_trending():
 @app.route('/api/predict_spread', methods=['POST'])
 def api_predict_spread():
     """
-    Spread Risk Modeling -- now powered by a real trained Graph Attention
-    Network (Phase 6). See gnn/ for the model, training script, and
-    inference code. Falls back to a labeled heuristic if the model can't
-    load or inference fails, so this endpoint never hard-crashes.
+    Spread Risk Estimation.
+    Primary path: a real trained Graph Attention Network (Phase 6). See
+    gnn/ for the model, training script, and inference code.
+    Fallback path: if the trained model can't load or inference throws for
+    any reason, we fall back to spread_predictor.py's explainable heuristic
+    scorer (real graph-centrality + knowledge-base-similarity signals, not
+    a placeholder) so this endpoint never hard-crashes and never silently
+    returns nothing.
     """
-    claim = (request.json or {}).get('claim', '')
-    if not claim.strip():
+    claim = (request.json or {}).get('claim', '').strip()
+    if not claim:
         return jsonify({"error": "No claim provided."}), 400
 
     # Run the same verification pipeline used by /api/verify so the GNN's
     # risk features (verdict, confidence, entities) are grounded in real
     # evidence, not guessed independently.
     verification = verify_claim(claim)
-    graph_data = predict_spread(
-        claim_text=claim,
-        verdict=verification.get("verdict", "Unverified"),
-        confidence=verification.get("confidence", 0),
-        entities=verification.get("entities", []),
-    )
-    return jsonify(graph_data)
+
+    try:
+        graph_data = predict_spread(
+            claim_text=claim,
+            verdict=verification.get("verdict", "Unverified"),
+            confidence=verification.get("confidence", 0),
+            entities=verification.get("entities", []),
+        )
+        graph_data.setdefault("used_trained_gnn", True)
+        return jsonify(graph_data)
+    except Exception as e:
+        print(f"GNN prediction failed, falling back to heuristic scorer: {e}")
+        entities = verification.get("entities") or extract_entities(claim)
+        evidence = retrieve_evidence(claim, top_k=5)
+        result = spread_predictor.analyze_spread_risk(claim, entities, evidence)
+        result["used_trained_gnn"] = False
+        result["fallback_reason"] = "Trained GNN unavailable, used the heuristic scorer instead."
+        return jsonify(result)
 
 
 @app.route('/api/passport', methods=['GET', 'POST'])
