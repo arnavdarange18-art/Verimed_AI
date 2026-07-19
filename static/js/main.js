@@ -170,12 +170,80 @@ function renderCheckerResult(data) {
     const speakBtn = document.getElementById("speakResultBtn");
     const speakLabel = document.getElementById("speakResultLabel");
     if (speakBtn && "speechSynthesis" in window) {
-        speakBtn.onclick = () => {
-            window.speechSynthesis.cancel(); // stop any previous playback
+        const SPEECH_LANG_MAP = {
+            en: "en-US",
+            hi: "hi-IN",
+            mr: "mr-IN",
+            es: "es-ES",
+        };
+
+        let speakNote = document.getElementById("speakVoiceNote");
+        if (!speakNote && speakBtn.parentElement) {
+            speakNote = document.createElement("div");
+            speakNote.id = "speakVoiceNote";
+            speakNote.className = "text-[10px] text-slate-400 mt-1 hidden";
+            speakBtn.parentElement.appendChild(speakNote);
+        }
+
+        // Chrome loads its voice list asynchronously. Calling
+        // getVoices() too early (e.g. the first time it's ever called on
+        // a page) can return an empty array even though voices exist --
+        // this waits for the real list instead of assuming it's ready.
+        function loadVoicesOnce() {
+            return new Promise((resolve) => {
+                const existing = window.speechSynthesis.getVoices();
+                if (existing.length > 0) {
+                    resolve(existing);
+                    return;
+                }
+                window.speechSynthesis.onvoiceschanged = () => {
+                    resolve(window.speechSynthesis.getVoices());
+                };
+                // Safety timeout in case the event never fires on some browsers
+                setTimeout(() => resolve(window.speechSynthesis.getVoices()), 1000);
+            });
+        }
+
+        speakBtn.onclick = async () => {
+            if (window.speechSynthesis.speaking) {
+                window.speechSynthesis.cancel();
+                speakLabel.textContent = "Listen";
+                return;
+            }
+
+            const availableVoices = await loadVoicesOnce();
+
             const utterance = new SpeechSynthesisUtterance(
                 `Verdict: ${data.verdict}. ${data.explanation || ""}`
             );
             utterance.rate = 0.95;
+
+            const targetLangCode = SPEECH_LANG_MAP[data.language_processed] || "en-US";
+            let chosenVoice = availableVoices.find(v => v.lang === targetLangCode);
+
+            if (!chosenVoice && data.language_processed === "mr") {
+                chosenVoice = availableVoices.find(v => v.lang === "hi-IN");
+            }
+
+            if (chosenVoice) {
+                utterance.voice = chosenVoice;
+                utterance.lang = chosenVoice.lang;
+            } else {
+                utterance.lang = "en-US";
+            }
+
+            if (speakNote) {
+                if (!chosenVoice) {
+                    speakNote.textContent = `No voice available for this language on your device -- using default.`;
+                    speakNote.classList.remove("hidden");
+                } else if (chosenVoice.lang !== targetLangCode) {
+                    speakNote.textContent = `No Marathi voice found on this device -- using the closest available (Hindi) voice instead.`;
+                    speakNote.classList.remove("hidden");
+                } else {
+                    speakNote.classList.add("hidden");
+                }
+            }
+
             utterance.onstart = () => { speakLabel.textContent = "Stop"; };
             utterance.onend = () => { speakLabel.textContent = "Listen"; };
             window.speechSynthesis.speak(utterance);
@@ -200,7 +268,7 @@ async function runPredictionPipeline() {
     panel.innerHTML = `
         <div class="m-auto text-center text-slate-500 font-bold text-xs flex flex-col gap-2 items-center">
             <i class="fa-solid fa-circle-nodes text-3xl text-purple-500/50 animate-spin"></i>
-            Running network spread simulation...
+            Computing spread risk signals...
         </div>
     `;
 
@@ -213,34 +281,41 @@ async function runPredictionPipeline() {
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || "Prediction failed.");
 
-        const riskColor = data.risk_level === "High Risk" ? "text-red-400" : "text-emerald-400";
+        const riskColor = data.risk_level === "High Risk" ? "text-red-400" : (data.risk_level === "Medium Risk" ? "text-amber-400" : "text-emerald-400");
+        const breakdown = data.signal_breakdown || {};
+
         panel.innerHTML = `
-            ${data.is_simulated ? `<div class="text-[10px] uppercase tracking-wider font-bold text-amber-400 mb-1">
-                <i class="fa-solid fa-flask mr-1"></i> Simulated placeholder -- GNN model not yet trained
-            </div>` : ""}
+            <div class="text-[10px] uppercase tracking-wider font-bold text-blue-400 mb-1 flex items-center gap-1.5">
+                <i class="fa-solid fa-diagram-project"></i> Heuristic graph + language analysis -- not a trained model
+            </div>
             <div class="grid grid-cols-2 gap-4">
                 <div class="bg-slate-800/60 rounded-xl p-4">
-                    <span class="text-[10px] uppercase font-bold text-slate-400">Virality Score</span>
-                    <div class="text-3xl font-black mt-1">${escapeHtml(data.virality_score)}</div>
+                    <span class="text-[10px] uppercase font-bold text-slate-400">Risk Score</span>
+                    <div class="text-3xl font-black mt-1">${escapeHtml(data.virality_score)}<span class="text-sm text-slate-500">/100</span></div>
                 </div>
                 <div class="bg-slate-800/60 rounded-xl p-4">
                     <span class="text-[10px] uppercase font-bold text-slate-400">Risk Level</span>
                     <div class="text-xl font-black mt-1 ${riskColor}">${escapeHtml(data.risk_level)}</div>
                 </div>
                 <div class="bg-slate-800/60 rounded-xl p-4">
-                    <span class="text-[10px] uppercase font-bold text-slate-400">Predicted Nodes Reached</span>
-                    <div class="text-2xl font-black mt-1">${escapeHtml(data.predicted_nodes_reached)}</div>
+                    <span class="text-[10px] uppercase font-bold text-slate-400">Estimated Reach (order of magnitude)</span>
+                    <div class="text-xl font-black mt-1">${escapeHtml(data.reach_estimate_bucket)}</div>
                 </div>
                 <div class="bg-slate-800/60 rounded-xl p-4">
-                    <span class="text-[10px] uppercase font-bold text-slate-400">Time To Peak</span>
+                    <span class="text-[10px] uppercase font-bold text-slate-400">Est. Time To Peak</span>
                     <div class="text-2xl font-black mt-1">${escapeHtml(data.time_to_peak_hours)}h</div>
                 </div>
             </div>
             <div class="bg-slate-800/60 rounded-xl p-4">
-                <span class="text-[10px] uppercase font-bold text-slate-400 block mb-2">Vulnerable Network Hubs</span>
-                <div class="flex flex-wrap gap-2">
-                    ${(data.network_hubs_vulnerable || []).map(h => `<span class="text-[11px] font-bold bg-purple-500/10 text-purple-300 px-2.5 py-1 rounded-full border border-purple-500/20">${escapeHtml(h)}</span>`).join("")}
+                <span class="text-[10px] uppercase font-bold text-slate-400 block mb-2">Signal Breakdown</span>
+                <div class="flex flex-col gap-2 text-xs">
+                    <div class="flex justify-between"><span class="text-slate-300">Matches known misinformation pattern</span><span class="font-bold">${escapeHtml(breakdown.misinformation_pattern_match ?? "-")}</span></div>
+                    <div class="flex justify-between"><span class="text-slate-300">Sensational language score</span><span class="font-bold">${escapeHtml(breakdown.sensational_language_score ?? "-")}</span></div>
+                    <div class="flex justify-between"><span class="text-slate-300">Entity graph embeddedness</span><span class="font-bold">${escapeHtml(breakdown.entity_embeddedness_score ?? "-")}</span></div>
                 </div>
+            </div>
+            <div class="text-[10px] text-slate-500 leading-relaxed px-1">
+                ${escapeHtml(data.methodology || "")}
             </div>
         `;
     } catch (err) {

@@ -56,9 +56,22 @@ def ingest():
         for fact in facts
     ]
 
-    collection.add(ids=ids, documents=documents, metadatas=metadatas)
+    # Insert in batches -- ChromaDB (and the embedding step under the hood)
+    # has a max batch size, so a single collection.add() call fails once
+    # the seed dataset grows into the thousands. 500 is comfortably under
+    # any known limit while still being efficient.
+    BATCH_SIZE = 500
+    total = len(facts)
+    for start in range(0, total, BATCH_SIZE):
+        end = min(start + BATCH_SIZE, total)
+        collection.add(
+            ids=ids[start:end],
+            documents=documents[start:end],
+            metadatas=metadatas[start:end],
+        )
+        print(f"  Ingested {end}/{total}...")
 
-    print(f"\n✅ Ingested {len(facts)} facts into ChromaDB at '{DB_PATH}'")
+    print(f"\n✅ Ingested {total} facts into ChromaDB at '{DB_PATH}'")
     print(f"Collection '{COLLECTION_NAME}' is ready for retrieval.")
 
 
