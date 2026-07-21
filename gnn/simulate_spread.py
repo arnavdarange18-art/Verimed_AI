@@ -25,12 +25,17 @@ def simulate_epidemic_spread(
     seed_node: int,
     max_steps: int = 20,
     rng: random.Random | None = None,
-) -> tuple[int, int, list[int]]:
+    return_set: bool = False,
+):
     """
     Simulates how a claim spreads through the network starting from seed_node.
 
     claim_risk_score: 0-1, higher = spreads more aggressively (false/sensational claims)
-    Returns: (total_nodes_reached, step_of_peak_growth, step_by_step_infected_counts)
+    return_set: if True, returns the actual set of infected node IDs as a 4th
+                value (used by the visualization graph to color nodes) --
+                default False keeps this backward-compatible with existing
+                callers like train_gnn.py.
+    Returns: (total_nodes_reached, step_of_peak_growth, step_by_step_infected_counts[, infected_set])
     """
     rng = rng or random.Random()
 
@@ -57,6 +62,8 @@ def simulate_epidemic_spread(
     total_reached = len(infected)
     peak_step = (history.index(max(history)) + 1) if history else 1
 
+    if return_set:
+        return total_reached, peak_step, history, infected
     return total_reached, peak_step, history
 
 

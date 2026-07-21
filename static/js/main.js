@@ -16,6 +16,14 @@ function verdictColorClasses(verdict) {
     }
 }
 
+// The backend/LLM still uses "Unverified" internally (verdict logic, DB
+// storage, colors above all key off it) -- this only relabels the TEXT
+// shown to the user, since "Unverified" reads poorly in a results card.
+function displayVerdictLabel(verdict) {
+    if ((verdict || "").toLowerCase() === "unverified") return "Not Reliable";
+    return verdict || "Not Reliable";
+}
+
 // ---------- Emergency Help page ----------
 
 const useGpsBtn = document.getElementById("useGpsBtn");
@@ -211,58 +219,80 @@ if (checkerForm) {
     const SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
 
     function mapSpeechLanguage(code) {
-        const langMap = { en: "en-US", hi: "hi-IN", mr: "mr-IN", es: "es-ES" };
+        const langMap = { en: "en-US", hi: "hi-IN", mr: "mr-IN" };
         return langMap[code] || "en-US";
     }
 
     if (voiceBtn && SpeechRecognitionAPI) {
-        const recognition = new SpeechRecognitionAPI();
-        recognition.continuous = false;
-        recognition.interimResults = false;
-        recognition.maxAlternatives = 1;
+        let recognition = null;
         let isListening = false;
 
         const setListeningState = (listening) => {
             isListening = listening;
             voiceBtn.classList.toggle("text-red-600", listening);
-            voiceLabel.textContent = listening ? "Listening..." : "Speak";
+            voiceLabel.textContent = listening ? "Listening... (tap to stop)" : "Speak";
         };
 
+        function createRecognition() {
+            // IMPORTANT: create a NEW instance every time instead of reusing
+            // one long-lived object. Reusing the same SpeechRecognition
+            // instance across multiple start/stop cycles is a known source
+            // of silent failures in Chrome (later attempts stop firing
+            // 'result' events even though the mic is active) -- this was
+            // the root cause of "mic keeps stopping and not writing text".
+            const instance = new SpeechRecognitionAPI();
+
+            // continuous=true so it keeps listening through natural pauses
+            // in speech instead of auto-stopping after 1-2 seconds of
+            // silence (which is what continuous=false was doing, and is
+            // why it felt like it kept cutting out).
+            instance.continuous = true;
+            instance.interimResults = false;
+            instance.maxAlternatives = 1;
+
+            const langSelect = checkerForm.querySelector("select[name='language']");
+            instance.lang = mapSpeechLanguage(langSelect ? langSelect.value : "en");
+
+            instance.addEventListener("result", (event) => {
+                // With interimResults=false, every result here is final.
+                // Only append the LATEST result, not the whole history,
+                // to avoid duplicating text on each new phrase.
+                const latest = event.results[event.results.length - 1];
+                const transcript = latest[0]?.transcript?.trim();
+                if (transcript) {
+                    claimTextarea.value = (claimTextarea.value ? `${claimTextarea.value} ${transcript}`.trim() : transcript);
+                }
+            });
+
+            instance.addEventListener("end", () => {
+                setListeningState(false);
+            });
+
+            instance.addEventListener("error", (event) => {
+                console.warn("Speech recognition error:", event.error);
+                setListeningState(false);
+                if (event.error === "not-allowed" || event.error === "service-not-allowed") {
+                    alert("Microphone access was blocked. Please allow microphone permission for this site and try again.");
+                }
+            });
+
+            return instance;
+        }
+
         voiceBtn.addEventListener("click", () => {
-            if (isListening) {
+            if (isListening && recognition) {
                 recognition.stop();
                 return;
             }
 
-            const langSelect = checkerForm.querySelector("select[name='language']");
-            recognition.lang = mapSpeechLanguage(langSelect ? langSelect.value : "en");
-
+            recognition = createRecognition();
             try {
                 recognition.start();
                 setListeningState(true);
             } catch (err) {
+                console.warn("Could not start speech recognition:", err);
                 setListeningState(false);
             }
-        });
-
-        recognition.addEventListener("result", (event) => {
-            const transcript = Array.from(event.results)
-                .map((result) => result[0]?.transcript || "")
-                .join(" ")
-                .trim();
-
-            if (transcript) {
-                claimTextarea.value = (claimTextarea.value ? `${claimTextarea.value} ${transcript}`.trim() : transcript);
-            }
-        });
-
-        recognition.addEventListener("end", () => {
-            setListeningState(false);
-        });
-
-        recognition.addEventListener("error", (event) => {
-            console.warn("Speech recognition error:", event.error);
-            setListeningState(false);
         });
     } else if (voiceBtn) {
         // Browser doesn't support Speech Recognition (e.g. Firefox) -- hide gracefully
@@ -314,18 +344,29 @@ function renderCheckerResult(data) {
 
     // If the claim came from an uploaded screenshot, show the OCR'd text so
     // the user can confirm it was read correctly before trusting the verdict.
-    let ocrNote = "";
-    const existingOcrNote = document.getElementById("ocrExtractedNote");
-    if (existingOcrNote) existingOcrNote.remove();
-    if (data.ocr_used && data.claim_text_used) {
-        ocrNote = document.createElement("div");
-        ocrNote.id = "ocrExtractedNote";
-        ocrNote.className = "text-[11px] font-semibold text-slate-500 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 mb-1";
-        ocrNote.innerHTML = `<i class="fa-solid fa-text-height mr-1"></i> Text read from image: "${escapeHtml(data.claim_text_used)}"`;
-        verdictBadge.parentElement.insertBefore(ocrNote, verdictBadge);
+    // If it was translated, show that too -- this is the fastest way to
+    // spot whether an "Unverified" result is due to bad OCR/translation,
+    // vs. the claim genuinely not being covered by the evidence base.
+    let existingDebugNote = document.getElementById("ocrExtractedNote");
+    if (existingDebugNote) existingDebugNote.remove();
+
+    if (data.ocr_used || (data.raw_text_detected && data.raw_text_detected !== data.claim_text_used)) {
+        const debugNote = document.createElement("div");
+        debugNote.id = "ocrExtractedNote";
+        debugNote.className = "text-[11px] font-semibold text-slate-500 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 mb-1 space-y-1";
+
+        let html = "";
+        if (data.ocr_used) {
+            html += `<div><i class="fa-solid fa-text-height mr-1"></i>Text read from image: "${escapeHtml(data.raw_text_detected)}"</div>`;
+        }
+        if (data.raw_text_detected !== data.claim_text_used) {
+            html += `<div><i class="fa-solid fa-language mr-1"></i>Text used for verification (translated to English): "${escapeHtml(data.claim_text_used)}"</div>`;
+        }
+        debugNote.innerHTML = html;
+        verdictBadge.parentElement.insertBefore(debugNote, verdictBadge);
     }
 
-    document.getElementById("verdictLabel").textContent = data.verdict || "Unverified";
+    document.getElementById("verdictLabel").textContent = displayVerdictLabel(data.verdict);
     document.getElementById("explanationText").textContent = data.explanation || "";
 
     const confidence = Number(data.confidence) || 0;
@@ -357,19 +398,17 @@ function renderCheckerResult(data) {
         sourceContainer.innerHTML = `<span class="text-xs text-slate-400">No sources returned.</span>`;
     }
 
-    document.getElementById("shareVerdict").textContent = `Verdict: ${data.verdict || "Unverified"}`;
+    // ---- Method Comparison: BERT vs RAG vs GNN ----
+    renderMethodComparison(data.method_comparison);
+
+    document.getElementById("shareVerdict").textContent = `Verdict: ${displayVerdictLabel(data.verdict)}`;
     document.getElementById("shareExplanation").textContent = data.explanation || "";
 
     // ---- Text-to-speech: read the verdict + explanation aloud ----
     const speakBtn = document.getElementById("speakResultBtn");
     const speakLabel = document.getElementById("speakResultLabel");
     if (speakBtn && "speechSynthesis" in window) {
-        const SPEECH_LANG_MAP = {
-            en: "en-US",
-            hi: "hi-IN",
-            mr: "mr-IN",
-            es: "es-ES",
-        };
+        const SPEECH_LANG_MAP = { en: "en-US", hi: "hi-IN", mr: "mr-IN" };
 
         let speakNote = document.getElementById("speakVoiceNote");
         if (!speakNote && speakBtn.parentElement) {
@@ -379,10 +418,6 @@ function renderCheckerResult(data) {
             speakBtn.parentElement.appendChild(speakNote);
         }
 
-        // Chrome loads its voice list asynchronously. Calling
-        // getVoices() too early (e.g. the first time it's ever called on
-        // a page) can return an empty array even though voices exist --
-        // this waits for the real list instead of assuming it's ready.
         function loadVoicesOnce() {
             return new Promise((resolve) => {
                 const existing = window.speechSynthesis.getVoices();
@@ -393,49 +428,84 @@ function renderCheckerResult(data) {
                 window.speechSynthesis.onvoiceschanged = () => {
                     resolve(window.speechSynthesis.getVoices());
                 };
-                // Safety timeout in case the event never fires on some browsers
                 setTimeout(() => resolve(window.speechSynthesis.getVoices()), 1000);
             });
         }
 
+        let ttsAudio = null; // tracks a playing server-side TTS <audio>, if any
+
+        async function speakViaServerFallback(text, langCode) {
+            // Used when the browser has no matching voice installed for the
+            // selected language -- this guarantees correct-language audio
+            // (via gTTS server-side) instead of silently reading in English.
+            if (speakNote) {
+                speakNote.textContent = "No local voice found for this language -- generating audio online...";
+                speakNote.classList.remove("hidden");
+            }
+            speakLabel.textContent = "Loading...";
+
+            try {
+                const res = await fetch("/api/tts", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ text, lang: langCode }),
+                });
+                if (!res.ok) throw new Error("Server TTS failed.");
+
+                const blob = await res.blob();
+                const url = URL.createObjectURL(blob);
+                ttsAudio = new Audio(url);
+                ttsAudio.onplay = () => { speakLabel.textContent = "Stop"; };
+                ttsAudio.onended = () => { speakLabel.textContent = "Listen"; };
+                ttsAudio.onerror = () => { speakLabel.textContent = "Listen"; };
+                await ttsAudio.play();
+            } catch (err) {
+                console.warn("Server-side TTS fallback failed:", err);
+                speakLabel.textContent = "Listen";
+                if (speakNote) {
+                    speakNote.textContent = "Couldn't generate audio for this language right now.";
+                }
+            }
+        }
+
         speakBtn.onclick = async () => {
+            // Stop whichever playback mode is currently active
             if (window.speechSynthesis.speaking || window.speechSynthesis.pending) {
                 window.speechSynthesis.cancel();
                 speakLabel.textContent = "Listen";
                 return;
             }
+            if (ttsAudio && !ttsAudio.paused) {
+                ttsAudio.pause();
+                speakLabel.textContent = "Listen";
+                return;
+            }
+
+            const textToSpeak = `Verdict: ${data.verdict}. ${data.explanation || ""}`;
+            const langCode = data.language_processed || "en";
+            const targetLangCode = SPEECH_LANG_MAP[langCode] || "en-US";
 
             const availableVoices = await loadVoicesOnce();
-
-            const utterance = new SpeechSynthesisUtterance(
-                `Verdict: ${data.verdict}. ${data.explanation || ""}`
-            );
-            utterance.rate = 0.95;
-
-            const targetLangCode = SPEECH_LANG_MAP[data.language_processed] || "en-US";
             let chosenVoice = availableVoices.find(v => v.lang === targetLangCode);
-
-            if (!chosenVoice && data.language_processed === "mr") {
+            if (!chosenVoice && langCode === "mr") {
                 chosenVoice = availableVoices.find(v => v.lang === "hi-IN");
             }
 
+            if (!chosenVoice && langCode !== "en") {
+                // No matching voice on this device -- use the server-side
+                // fallback instead of silently defaulting to English.
+                await speakViaServerFallback(textToSpeak, langCode);
+                return;
+            }
+
+            const utterance = new SpeechSynthesisUtterance(textToSpeak);
+            utterance.rate = 0.95;
             if (chosenVoice) {
                 utterance.voice = chosenVoice;
                 utterance.lang = chosenVoice.lang;
+                if (speakNote) speakNote.classList.add("hidden");
             } else {
                 utterance.lang = "en-US";
-            }
-
-            if (speakNote) {
-                if (!chosenVoice) {
-                    speakNote.textContent = `No voice available for this language on your device -- using default.`;
-                    speakNote.classList.remove("hidden");
-                } else if (chosenVoice.lang !== targetLangCode) {
-                    speakNote.textContent = `No Marathi voice found on this device -- using the closest available (Hindi) voice instead.`;
-                    speakNote.classList.remove("hidden");
-                } else {
-                    speakNote.classList.add("hidden");
-                }
             }
 
             utterance.onstart = () => { speakLabel.textContent = "Stop"; };
@@ -478,15 +548,19 @@ async function runPredictionPipeline() {
         if (!res.ok) throw new Error(data.error || "Prediction failed.");
 
         const riskColor = data.risk_level === "High Risk" ? "text-red-400" : (data.risk_level === "Medium Risk" ? "text-amber-400" : "text-emerald-400");
-        const breakdown = data.signal_breakdown || {};
+
+        const engineLabel = data.is_simulated
+            ? `<i class="fa-solid fa-triangle-exclamation"></i> Fallback heuristic -- trained model unavailable`
+            : `<i class="fa-solid fa-circle-check"></i> Real trained Graph Attention Network (GAT)`;
+        const engineColor = data.is_simulated ? "text-amber-400" : "text-emerald-400";
 
         panel.innerHTML = `
-            <div class="text-[10px] uppercase tracking-wider font-bold text-blue-400 mb-1 flex items-center gap-1.5">
-                <i class="fa-solid fa-diagram-project"></i> Heuristic graph + language analysis -- not a trained model
+            <div class="text-[10px] uppercase tracking-wider font-bold ${engineColor} mb-1 flex items-center gap-1.5">
+                ${engineLabel}
             </div>
             <div class="grid grid-cols-2 gap-4">
                 <div class="bg-slate-800/60 rounded-xl p-4">
-                    <span class="text-[10px] uppercase font-bold text-slate-400">Risk Score</span>
+                    <span class="text-[10px] uppercase font-bold text-slate-400">Virality Score</span>
                     <div class="text-3xl font-black mt-1">${escapeHtml(data.virality_score)}<span class="text-sm text-slate-500">/100</span></div>
                 </div>
                 <div class="bg-slate-800/60 rounded-xl p-4">
@@ -494,8 +568,8 @@ async function runPredictionPipeline() {
                     <div class="text-xl font-black mt-1 ${riskColor}">${escapeHtml(data.risk_level)}</div>
                 </div>
                 <div class="bg-slate-800/60 rounded-xl p-4">
-                    <span class="text-[10px] uppercase font-bold text-slate-400">Estimated Reach (order of magnitude)</span>
-                    <div class="text-xl font-black mt-1">${escapeHtml(data.reach_estimate_bucket)}</div>
+                    <span class="text-[10px] uppercase font-bold text-slate-400">Predicted Nodes Reached</span>
+                    <div class="text-xl font-black mt-1">${escapeHtml(data.predicted_nodes_reached)}</div>
                 </div>
                 <div class="bg-slate-800/60 rounded-xl p-4">
                     <span class="text-[10px] uppercase font-bold text-slate-400">Est. Time To Peak</span>
@@ -503,20 +577,76 @@ async function runPredictionPipeline() {
                 </div>
             </div>
             <div class="bg-slate-800/60 rounded-xl p-4">
-                <span class="text-[10px] uppercase font-bold text-slate-400 block mb-2">Signal Breakdown</span>
-                <div class="flex flex-col gap-2 text-xs">
-                    <div class="flex justify-between"><span class="text-slate-300">Matches known misinformation pattern</span><span class="font-bold">${escapeHtml(breakdown.misinformation_pattern_match ?? "-")}</span></div>
-                    <div class="flex justify-between"><span class="text-slate-300">Sensational language score</span><span class="font-bold">${escapeHtml(breakdown.sensational_language_score ?? "-")}</span></div>
-                    <div class="flex justify-between"><span class="text-slate-300">Entity graph embeddedness</span><span class="font-bold">${escapeHtml(breakdown.entity_embeddedness_score ?? "-")}</span></div>
+                <span class="text-[10px] uppercase font-bold text-slate-400 block mb-2">Vulnerable Network Hubs</span>
+                <div class="flex flex-wrap gap-2">
+                    ${(data.network_hubs_vulnerable || []).map(h => `<span class="text-[11px] bg-slate-700/70 px-2.5 py-1 rounded-full">${escapeHtml(h)}</span>`).join("")}
                 </div>
             </div>
+
+            <div class="bg-slate-800/60 rounded-xl p-4">
+                <div class="flex items-center justify-between mb-3">
+                    <span class="text-[10px] uppercase font-bold text-slate-400"><i class="fa-solid fa-circle-nodes mr-1"></i>Simulated Network Spread (node-by-node)</span>
+                    <span class="text-[10px] text-slate-400">${data.visualization ? `${escapeHtml(data.visualization.infected_count)}/${escapeHtml(data.visualization.total_count)} nodes reached` : ""}</span>
+                </div>
+                <div id="spreadGraphContainer" class="w-full flex justify-center"></div>
+                <div class="flex items-center gap-4 mt-3 text-[10px] text-slate-400">
+                    <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-red-500 inline-block"></span>Reached by claim</span>
+                    <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-slate-500 inline-block"></span>Not reached</span>
+                    <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-amber-400 inline-block"></span>Hub account</span>
+                    <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full border-2 border-white inline-block"></span>Origin node</span>
+                </div>
+            </div>
+
             <div class="text-[10px] text-slate-500 leading-relaxed px-1">
-                ${escapeHtml(data.methodology || "")}
+                This graph is a smaller, legible network built for visualization, but it runs the SAME epidemic simulation logic used to train the GAT -- so what you see is a real, claim-specific simulation, not a canned animation.
             </div>
         `;
+
+        if (data.visualization) {
+            renderSpreadGraph(data.visualization);
+        }
     } catch (err) {
         panel.innerHTML = `<div class="m-auto text-center text-red-400 font-bold text-xs">${escapeHtml(err.message)}</div>`;
     }
+}
+
+function renderSpreadGraph(viz) {
+    const container = document.getElementById("spreadGraphContainer");
+    if (!container) return;
+
+    const width = 480;
+    const height = 320;
+    const padding = 24;
+
+    const scaleX = (x) => padding + x * (width - 2 * padding);
+    const scaleY = (y) => padding + y * (height - 2 * padding);
+
+    const nodeById = {};
+    viz.nodes.forEach((n) => { nodeById[n.id] = n; });
+
+    const edgeLines = viz.edges.map((e) => {
+        const a = nodeById[e.source];
+        const b = nodeById[e.target];
+        if (!a || !b) return "";
+        return `<line x1="${scaleX(a.x)}" y1="${scaleY(a.y)}" x2="${scaleX(b.x)}" y2="${scaleY(b.y)}" stroke="#334155" stroke-width="1" opacity="0.5" />`;
+    }).join("");
+
+    const nodeCircles = viz.nodes.map((n) => {
+        let fill = n.infected ? "#EF4444" : "#64748B";
+        if (n.is_hub) fill = n.infected ? "#F59E0B" : "#78716C";
+        const radius = n.is_seed ? 8 : (n.is_hub ? 6 : 4);
+        const stroke = n.is_seed ? `stroke="white" stroke-width="2"` : "";
+        return `<circle cx="${scaleX(n.x)}" cy="${scaleY(n.y)}" r="${radius}" fill="${fill}" ${stroke}>
+            <title>Node ${n.id}${n.is_seed ? " (origin)" : ""}${n.is_hub ? " (hub)" : ""} -- ${n.infected ? "reached" : "not reached"}</title>
+        </circle>`;
+    }).join("");
+
+    container.innerHTML = `
+        <svg viewBox="0 0 ${width} ${height}" class="w-full max-w-lg" style="background:transparent;">
+            ${edgeLines}
+            ${nodeCircles}
+        </svg>
+    `;
 }
 
 // ---------- Passport page ----------
@@ -778,7 +908,7 @@ if (trendingContainer) {
                 return `
                     <div class="bg-white p-4 rounded-xl border ${colors.badge} flex items-center justify-between gap-4">
                         <div class="flex items-center gap-3 min-w-0">
-                            <span class="text-[10px] font-black uppercase px-2 py-1 rounded-full ${colors.badge} shrink-0">${escapeHtml(t.verdict || "Unverified")}</span>
+                            <span class="text-[10px] font-black uppercase px-2 py-1 rounded-full ${colors.badge} shrink-0">${escapeHtml(displayVerdictLabel(t.verdict))}</span>
                             <p class="text-sm font-semibold text-slate-700 truncate">"${escapeHtml(t.claim_text || "")}"</p>
                         </div>
                         <span class="text-xs font-bold text-slate-400 shrink-0">${escapeHtml(t.check_count)}x checked</span>
@@ -809,7 +939,7 @@ if (latestAlertsContainer) {
                 const colors = verdictColorClasses(h.verdict);
                 return `
                     <div class="bg-white p-5 border rounded-2xl shadow-sm ${colors.badge}">
-                        <span class="text-xs font-black uppercase tracking-wide">${escapeHtml(h.verdict || "Unverified")}</span>
+                        <span class="text-xs font-black uppercase tracking-wide">${escapeHtml(displayVerdictLabel(h.verdict))}</span>
                         <p class="text-sm font-bold text-slate-800 mt-2 leading-snug">"${escapeHtml((h.claim_text || "").slice(0, 90))}${(h.claim_text || "").length > 90 ? "..." : ""}"</p>
                         <p class="text-xs text-slate-400 mt-2">${escapeHtml(h.timestamp || "")}</p>
                     </div>`;
@@ -818,6 +948,47 @@ if (latestAlertsContainer) {
         .catch(() => {
             latestAlertsContainer.innerHTML = `<div class="md:col-span-3 text-center text-red-400 text-sm py-6">Couldn't load recent alerts.</div>`;
         });
+}
+
+function renderMethodComparison(comparison) {
+    const barsContainer = document.getElementById("methodBarsContainer");
+    const conclusionBox = document.getElementById("methodConclusion");
+    if (!barsContainer || !conclusionBox) return;
+
+    if (!comparison || !comparison.methods) {
+        barsContainer.innerHTML = `<p class="text-xs text-slate-400">Comparison data unavailable for this result.</p>`;
+        conclusionBox.innerHTML = "";
+        return;
+    }
+
+    const colorForMethod = {
+        bert: { bar: "bg-slate-400", text: "text-slate-600" },
+        rag: { bar: "bg-blue-500", text: "text-blue-700" },
+        gnn: { bar: "bg-emerald-500", text: "text-emerald-700" },
+    };
+
+    barsContainer.innerHTML = comparison.methods
+        .map((m) => {
+            const colors = colorForMethod[m.key] || colorForMethod.bert;
+            const displayLabel = m.key === "rag" ? displayVerdictLabel(m.label) : m.label;
+            const winnerBadge = m.is_winner
+                ? `<span class="ml-2 text-[10px] font-black uppercase bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full">Most Reliable</span>`
+                : "";
+            return `
+            <div>
+                <div class="flex items-center justify-between mb-1">
+                    <span class="text-xs font-bold ${colors.text}">${escapeHtml(m.name)}${winnerBadge}</span>
+                    <span class="text-xs font-bold ${colors.text}">${escapeHtml(m.score)}/100 &middot; ${escapeHtml(displayLabel)}</span>
+                </div>
+                <div class="w-full bg-slate-100 h-3 rounded-full overflow-hidden">
+                    <div class="h-full ${colors.bar} transition-all duration-700 rounded-full" style="width: ${Math.max(m.score, 3)}%"></div>
+                </div>
+                <p class="text-[11px] text-slate-400 mt-1">${escapeHtml(m.description)}</p>
+            </div>`;
+        })
+        .join("");
+
+    conclusionBox.innerHTML = `<i class="fa-solid fa-circle-check text-purple-500 mr-1"></i><b>Conclusion:</b> ${escapeHtml(comparison.conclusion)}`;
 }
 
 function escapeHtml(str) {

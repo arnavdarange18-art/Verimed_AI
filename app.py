@@ -16,7 +16,8 @@ PROJECT_ROOT = os.path.dirname(__file__)
 if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 from gnn.gnn_predict import predict_spread
-print("✅ VERIMED GNN MODULE LOADED SUCCESSFULLY — v2")
+from gnn.visualization_graph import generate_visualization_graph
+from comparison import compute_method_comparison
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("FLASK_SECRET_KEY", "dev-only-change-me")
@@ -205,6 +206,17 @@ def api_verify():
     if language != "en":
         explanation_for_display = translate_utils.translate_from_english(explanation_for_display, language)
 
+    # Compute the GNN spread-risk prediction and the 3-method comparison.
+    # This reuses the verdict/confidence/entities already computed above --
+    # no second LLM call, just fast local scoring.
+    spread_result = predict_spread(
+        claim_text=claim_text,
+        verdict=result.get("verdict", "Unverified"),
+        confidence=result.get("confidence", 0),
+        entities=result.get("entities", []),
+    )
+    method_comparison = compute_method_comparison(claim_text, result, spread_result)
+
     response = {
         "verdict": result.get("verdict"),
         "confidence": result.get("confidence"),
@@ -213,9 +225,48 @@ def api_verify():
         "sources": result.get("sources", []),
         "language_processed": language,
         "ocr_used": ocr_used,
-        "claim_text_used": original_claim_text if (ocr_used or language != "en") else None,
+        "raw_text_detected": original_claim_text,
+        "claim_text_used": claim_text,
+        "spread_prediction": spread_result,
+        "method_comparison": method_comparison,
     }
     return jsonify(response)
+
+
+@app.route('/api/tts', methods=['POST'])
+def api_tts():
+    """
+    Server-side text-to-speech fallback using gTTS.
+
+    The browser's built-in speech synthesis depends on voices installed on
+    the user's device -- many devices don't have Hindi/Marathi voices
+    installed, which silently falls back to English. This endpoint
+    generates real audio in the requested language regardless of what's
+    installed locally.
+    """
+    from gtts import gTTS
+    import io
+
+    data = request.get_json(force=True) or {}
+    text = data.get('text', '').strip()
+    lang = data.get('lang', 'en')
+
+    if not text:
+        return jsonify({"error": "No text provided."}), 400
+
+    # gTTS language codes -- Marathi isn't supported by gTTS, so we fall
+    # back to Hindi audio for Marathi text (closer than English, and this
+    # is only reached when no local Marathi voice exists anyway).
+    gtts_lang = {"en": "en", "hi": "hi", "mr": "hi"}.get(lang, "en")
+
+    try:
+        tts = gTTS(text=text, lang=gtts_lang)
+        buf = io.BytesIO()
+        tts.write_to_fp(buf)
+        buf.seek(0)
+        return Response(buf.read(), mimetype='audio/mpeg')
+    except Exception as e:
+        return jsonify({"error": f"TTS generation failed: {e}"}), 500
 
 
 @app.route('/api/history', methods=['GET'])
@@ -256,6 +307,22 @@ def api_predict_spread():
         confidence=verification.get("confidence", 0),
         entities=verification.get("entities", []),
     )
+
+    # Node-by-node visualization -- a smaller, legible graph with the SAME
+    # epidemic simulation logic used to train the model, run live on this
+    # claim's actual risk profile. Wrapped defensively so a visualization
+    # bug never breaks the numeric prediction above.
+    try:
+        graph_data["visualization"] = generate_visualization_graph(
+            claim_text=claim,
+            verdict=verification.get("verdict", "Unverified"),
+            confidence=verification.get("confidence", 0),
+            entities=verification.get("entities", []),
+        )
+    except Exception as e:
+        print(f"[api_predict_spread] Visualization graph failed: {e}")
+        graph_data["visualization"] = None
+
     return jsonify(graph_data)
 
 
