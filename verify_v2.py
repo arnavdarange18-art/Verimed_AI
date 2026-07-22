@@ -67,36 +67,44 @@ def verify_claim(claim: str, top_k: int = 3) -> dict:
     # Step 3: LLM synthesis grounded in entities + evidence
     prompt = build_prompt(claim, entities, evidence_text)
 
-    response = client.chat.completions.create(
-        model="llama-3.3-70b-versatile",
-        messages=[{"role": "user", "content": prompt}],
-        temperature=0.2,
-    )
-
-    raw_output = response.choices[0].message.content
-    cleaned = raw_output.strip().replace("```json", "").replace("```", "").strip()
-
     try:
-        result = json.loads(cleaned)
-    except json.JSONDecodeError:
-        retry_response = client.chat.completions.create(
+        response = client.chat.completions.create(
             model="llama-3.3-70b-versatile",
             messages=[{"role": "user", "content": prompt}],
-            temperature=0.1,
+            temperature=0.2,
         )
-        retry_cleaned = (
-            retry_response.choices[0].message.content
-            .strip().replace("```json", "").replace("```", "").strip()
-        )
+
+        raw_output = response.choices[0].message.content
+        cleaned = raw_output.strip().replace("```json", "").replace("```", "").strip()
+
         try:
-            result = json.loads(retry_cleaned)
+            result = json.loads(cleaned)
         except json.JSONDecodeError:
-            result = {
-                "verdict": "Processing Error",
-                "confidence": 0,
-                "explanation": "Failed to generate a structured verdict. Please try again.",
-                "sources": [],
-            }
+            retry_response = client.chat.completions.create(
+                model="llama-3.3-70b-versatile",
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.1,
+            )
+            retry_cleaned = (
+                retry_response.choices[0].message.content
+                .strip().replace("```json", "").replace("```", "").strip()
+            )
+            try:
+                result = json.loads(retry_cleaned)
+            except json.JSONDecodeError:
+                result = {
+                    "verdict": "Processing Error",
+                    "confidence": 0,
+                    "explanation": "Failed to generate a structured verdict. Please try again.",
+                    "sources": [],
+                }
+    except Exception:
+        result = {
+            "verdict": "Processing Error",
+            "confidence": 0,
+            "explanation": "Verification service failed. Please try again later.",
+            "sources": [],
+        }
 
     result["entities"] = entities        # NEW -- expose extracted entities
     result["search_query_used"] = search_query  # NEW -- for debugging/demo

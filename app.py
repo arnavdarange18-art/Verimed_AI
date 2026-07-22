@@ -56,10 +56,6 @@ def home():
 def checker():
     return render_template('checker.html')
 
-@app.route('/predictor')
-def predictor():
-    return render_template('predictor.html')
-
 @app.route('/passport')
 @login_required
 def passport():
@@ -196,41 +192,57 @@ def api_verify():
     if language != "en":
         claim_text = translate_utils.translate_to_english(claim_text, language)
 
-    result = verify_claim(claim_text)
+    try:
+        result = verify_claim(claim_text)
 
-    # Persist to history in English (keeps retrieval/history consistent)
-    db.save_result(claim_text, result)
+        # Persist to history in English (keeps retrieval/history consistent)
+        db.save_result(claim_text, result)
 
-    # Translate the explanation back into the user's selected language for display
-    explanation_for_display = result.get("explanation", "")
-    if language != "en":
-        explanation_for_display = translate_utils.translate_from_english(explanation_for_display, language)
+        # Translate the explanation back into the user's selected language for display
+        explanation_for_display = result.get("explanation", "")
+        if language != "en":
+            explanation_for_display = translate_utils.translate_from_english(explanation_for_display, language)
 
-    # Compute the GNN spread-risk prediction and the 3-method comparison.
-    # This reuses the verdict/confidence/entities already computed above --
-    # no second LLM call, just fast local scoring.
-    spread_result = predict_spread(
-        claim_text=claim_text,
-        verdict=result.get("verdict", "Unverified"),
-        confidence=result.get("confidence", 0),
-        entities=result.get("entities", []),
-    )
-    method_comparison = compute_method_comparison(claim_text, result, spread_result)
+        # Compute the GNN spread-risk prediction and the 3-method comparison.
+        # This reuses the verdict/confidence/entities already computed above --
+        # no second LLM call, just fast local scoring.
+        spread_result = predict_spread(
+            claim_text=claim_text,
+            verdict=result.get("verdict", "Unverified"),
+            confidence=result.get("confidence", 0),
+            entities=result.get("entities", []),
+        )
+        method_comparison = compute_method_comparison(claim_text, result, spread_result)
 
-    response = {
-        "verdict": result.get("verdict"),
-        "confidence": result.get("confidence"),
-        "explanation": explanation_for_display,
-        "entities": result.get("entities", []),
-        "sources": result.get("sources", []),
-        "language_processed": language,
-        "ocr_used": ocr_used,
-        "raw_text_detected": original_claim_text,
-        "claim_text_used": claim_text,
-        "spread_prediction": spread_result,
-        "method_comparison": method_comparison,
-    }
-    return jsonify(response)
+        response = {
+            "verdict": result.get("verdict"),
+            "confidence": result.get("confidence"),
+            "explanation": explanation_for_display,
+            "entities": result.get("entities", []),
+            "sources": result.get("sources", []),
+            "language_processed": language,
+            "ocr_used": ocr_used,
+            "raw_text_detected": original_claim_text,
+            "claim_text_used": claim_text,
+            "spread_prediction": spread_result,
+            "method_comparison": method_comparison,
+        }
+        return jsonify(response)
+
+    except Exception as exc:
+        app.logger.exception("Claim verification failed")
+        return jsonify({
+            "error": "Failed to verify claim. Please try again.",
+            "explanation": "A server error occurred while processing your verification request.",
+            "verdict": "Unverified",
+            "confidence": 0,
+            "entities": [],
+            "sources": [],
+            "language_processed": language,
+            "ocr_used": ocr_used,
+            "raw_text_detected": original_claim_text,
+            "claim_text_used": claim_text,
+        }), 500
 
 
 @app.route('/api/tts', methods=['POST'])
@@ -280,50 +292,6 @@ def api_trending():
     limit = request.args.get('limit', default=5, type=int)
     return jsonify(db.get_trending_verdicts(limit=limit))
 
-
-@app.route('/api/predict_spread', methods=['POST'])
-def api_predict_spread():
-    """
-    Spread Risk Estimation.
-    Primary path: a real trained Graph Attention Network (Phase 6). See
-    gnn/ for the model, training script, and inference code.
-    Fallback path: if the trained model can't load or inference throws for
-    any reason, we fall back to spread_predictor.py's explainable heuristic
-    scorer (real graph-centrality + knowledge-base-similarity signals, not
-    a placeholder) so this endpoint never hard-crashes and never silently
-    returns nothing.
-    """
-    claim = (request.json or {}).get('claim', '').strip()
-    if not claim:
-        return jsonify({"error": "No claim provided."}), 400
-
-    # Run the same verification pipeline used by /api/verify so the GNN's
-    # risk features (verdict, confidence, entities) are grounded in real
-    # evidence, not guessed independently.
-    verification = verify_claim(claim)
-    graph_data = predict_spread(
-        claim_text=claim,
-        verdict=verification.get("verdict", "Unverified"),
-        confidence=verification.get("confidence", 0),
-        entities=verification.get("entities", []),
-    )
-
-    # Node-by-node visualization -- a smaller, legible graph with the SAME
-    # epidemic simulation logic used to train the model, run live on this
-    # claim's actual risk profile. Wrapped defensively so a visualization
-    # bug never breaks the numeric prediction above.
-    try:
-        graph_data["visualization"] = generate_visualization_graph(
-            claim_text=claim,
-            verdict=verification.get("verdict", "Unverified"),
-            confidence=verification.get("confidence", 0),
-            entities=verification.get("entities", []),
-        )
-    except Exception as e:
-        print(f"[api_predict_spread] Visualization graph failed: {e}")
-        graph_data["visualization"] = None
-
-    return jsonify(graph_data)
 
 
 @app.route('/api/passport', methods=['GET', 'POST'])

@@ -313,7 +313,18 @@ if (checkerForm) {
         try {
             const formData = new FormData(checkerForm);
             const res = await fetch("/api/verify", { method: "POST", body: formData });
-            const data = await res.json();
+
+            // Defensive: read the body exactly once, from a clone, so that
+            // even if something else in the page (e.g. a duplicated script
+            // block) also tries to read this response, it can't trigger
+            // "body stream already read".
+            let data;
+            try {
+                data = await res.clone().json();
+            } catch (parseErr) {
+                const rawText = await res.text();
+                throw new Error(`Server returned a non-JSON response (status ${res.status}): ${rawText.slice(0, 200)}`);
+            }
 
             if (!res.ok) {
                 throw new Error(data.explanation || data.error || "Verification failed.");
