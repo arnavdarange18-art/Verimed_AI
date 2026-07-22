@@ -22,6 +22,12 @@ from comparison import compute_method_comparison
 app = Flask(__name__)
 app.secret_key = os.environ.get("FLASK_SECRET_KEY", "dev-only-change-me")
 
+# Cache-busting: bump this automatically on every server restart, so
+# templates/base.html's ?v=... query param always forces browsers to fetch
+# the current CSS/JS instead of serving a stale cached copy after a deploy.
+import time
+app.config["ASSET_VERSION"] = str(int(time.time()))
+
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = "login"

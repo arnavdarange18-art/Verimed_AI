@@ -69,7 +69,7 @@ def verify_claim(claim: str, top_k: int = 3) -> dict:
 
     try:
         response = client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
+            model="openai/gpt-oss-120b",
             messages=[{"role": "user", "content": prompt}],
             temperature=0.2,
         )
@@ -81,7 +81,7 @@ def verify_claim(claim: str, top_k: int = 3) -> dict:
             result = json.loads(cleaned)
         except json.JSONDecodeError:
             retry_response = client.chat.completions.create(
-                model="llama-3.3-70b-versatile",
+                model="openai/gpt-oss-120b",
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0.1,
             )
@@ -98,7 +98,14 @@ def verify_claim(claim: str, top_k: int = 3) -> dict:
                     "explanation": "Failed to generate a structured verdict. Please try again.",
                     "sources": [],
                 }
-    except Exception:
+    except Exception as exc:
+        # This was silently swallowing the real error before -- printing it
+        # is essential for diagnosing why the Groq call actually failed
+        # (bad/missing API key, network block, rate limit, deprecated model
+        # name, etc.) instead of just seeing the generic fallback message.
+        import traceback
+        print(f"[verify_claim] Groq API call failed: {type(exc).__name__}: {exc}")
+        traceback.print_exc()
         result = {
             "verdict": "Processing Error",
             "confidence": 0,

@@ -6,7 +6,7 @@
     <title>VeriMed AI - Health Integrity Platform</title>
     <!-- Tailwind CSS Engine for Quick Structural Utilities -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v={{ config.get('ASSET_VERSION', '1') }}">
     <!-- FontAwesome Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
@@ -60,6 +60,6 @@
         Data Grounded via Live Academic Access Channels: WHO &middot; CDC &middot; NIH &middot; PubMed
     </footer>
 
-    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/main.js') }}?v={{ config.get('ASSET_VERSION', '1') }}"></script>
 </body>
 </html>
