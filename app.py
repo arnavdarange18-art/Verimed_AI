@@ -1,5 +1,6 @@
 from flask import Flask, render_template, request, jsonify, Response, redirect, url_for, flash, send_file
 import os
+import json
 
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 
@@ -363,6 +364,49 @@ def api_verify():
             "raw_text_detected": original_claim_text,
             "claim_text_used": claim_text,
         }), 500
+
+
+@app.route('/api/verify/report', methods=['POST'])
+def api_verify_report():
+    """Generate a downloadable PDF for the most recent claim verification."""
+    data = request.get_json(silent=True) or request.form.to_dict(flat=True) or {}
+
+    def parse_json_field(value, default):
+        if value is None or value == "":
+            return default
+        if isinstance(value, (dict, list)):
+            return value
+        try:
+            return json.loads(value)
+        except Exception:
+            return default
+
+    claim_text = (data.get("claim_text") or data.get("claim_text_used") or data.get("raw_text_detected") or "").strip()
+    verdict = data.get("verdict") or "Unverified"
+    confidence = int(data.get("confidence") or 0)
+    explanation = data.get("explanation") or ""
+    entities = parse_json_field(data.get("entities"), [])
+    sources = parse_json_field(data.get("sources"), [])
+    method_comparison = parse_json_field(data.get("method_comparison"), None)
+
+    if not claim_text:
+        return jsonify({"error": "No claim text provided for the report."}), 400
+
+    pdf_bytes = pdf_export.generate_verification_report_pdf(
+        claim_text=claim_text,
+        verdict=verdict,
+        confidence=confidence,
+        explanation=explanation,
+        entities=entities,
+        sources=sources,
+        method_comparison=method_comparison,
+    )
+
+    return Response(
+        pdf_bytes,
+        mimetype='application/pdf',
+        headers={"Content-Disposition": "attachment; filename=VeriMed_Claim_Verification_Report.pdf"},
+    )
 
 
 @app.route('/api/tts', methods=['POST'])

@@ -3,6 +3,8 @@
 
 // ---------- Helpers ----------
 
+let latestVerificationResult = null;
+
 function verdictColorClasses(verdict) {
     switch ((verdict || "").toLowerCase()) {
         case "true":
@@ -194,6 +196,7 @@ const checkerForm = document.getElementById("checkerForm");
 if (checkerForm) {
     const imageInput = document.getElementById("imageInput");
     const fileNameLabel = document.getElementById("fileName");
+    const downloadReportBtn = document.getElementById("downloadReportBtn");
 
     if (imageInput) {
         imageInput.addEventListener("change", () => {
@@ -321,6 +324,10 @@ if (checkerForm) {
                 throw new Error(data.explanation || data.error || "Verification failed.");
             }
 
+            latestVerificationResult = data;
+            try {
+                sessionStorage.setItem("verimed_latest_verification", JSON.stringify(data));
+            } catch (_) {}
             renderCheckerResult(data);
             placeholder.classList.add("hidden");
             resultsCard.classList.remove("hidden");
@@ -336,6 +343,61 @@ if (checkerForm) {
             submitBtn.innerHTML = originalBtnHtml;
         }
     });
+
+    if (downloadReportBtn) {
+        downloadReportBtn.addEventListener("click", async () => {
+            if (!latestVerificationResult) {
+                try {
+                    const cached = sessionStorage.getItem("verimed_latest_verification");
+                    if (cached) {
+                        latestVerificationResult = JSON.parse(cached);
+                    }
+                } catch (_) {}
+            }
+
+            if (!latestVerificationResult) {
+                alert("Run a verification first, then download the report.");
+                return;
+            }
+
+            const payload = {
+                ...latestVerificationResult,
+                claim_text: latestVerificationResult.claim_text_used || latestVerificationResult.raw_text_detected || "",
+            };
+
+            const originalHtml = downloadReportBtn.innerHTML;
+            downloadReportBtn.disabled = true;
+            downloadReportBtn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Generating...`;
+
+            try {
+                const res = await fetch("/api/verify/report", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(payload),
+                });
+
+                if (!res.ok) {
+                    const errData = await res.json().catch(() => ({}));
+                    throw new Error(errData.error || "Failed to generate the PDF report.");
+                }
+
+                const blob = await res.blob();
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement("a");
+                link.href = url;
+                link.download = "VeriMed_Claim_Verification_Report.pdf";
+                document.body.appendChild(link);
+                link.click();
+                link.remove();
+                setTimeout(() => URL.revokeObjectURL(url), 1500);
+            } catch (err) {
+                alert(err.message || "Failed to download the report.");
+            } finally {
+                downloadReportBtn.disabled = false;
+                downloadReportBtn.innerHTML = originalHtml;
+            }
+        });
+    }
 }
 
 function renderCheckerResult(data) {
