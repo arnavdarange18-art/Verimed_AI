@@ -75,54 +75,35 @@ if (useGpsBtn) {
         hospitalList.innerHTML = "";
         setStatus("Searching for hospitals and clinics nearby...");
 
-        // Overpass API (OpenStreetMap) -- free, no API key required
-        const query = `
-            [out:json][timeout:25];
-            (
-              node["amenity"="hospital"](around:6000,${lat},${lon});
-              way["amenity"="hospital"](around:6000,${lat},${lon});
-              node["amenity"="clinic"](around:6000,${lat},${lon});
-              way["amenity"="clinic"](around:6000,${lat},${lon});
-            );
-            out center 40;
-        `;
-
         try {
-            const res = await fetch("https://overpass-api.de/api/interpreter", {
-                method: "POST",
-                body: "data=" + encodeURIComponent(query),
-            });
-            if (!res.ok) throw new Error("Overpass API request failed.");
-            const data = await res.json();
+            const res = await fetch(`/api/nearby_hospitals?lat=${lat}&lon=${lon}`);
+            const results = await res.clone().json().catch(() => null);
 
-            const results = (data.elements || [])
-                .filter((el) => el.tags && el.tags.name)
-                .map((el) => {
-                    const elLat = el.lat || (el.center && el.center.lat);
-                    const elLon = el.lon || (el.center && el.center.lon);
-                    return {
-                        name: el.tags.name,
-                        type: el.tags.amenity === "hospital" ? "Hospital" : "Clinic",
-                        address: buildAddress(el.tags),
-                        phone: el.tags.phone || el.tags["contact:phone"] || null,
-                        lat: elLat,
-                        lon: elLon,
-                        distanceKm: elLat && elLon ? haversineDistanceKm(lat, lon, elLat, elLon) : null,
-                    };
-                })
-                .filter((h) => h.lat && h.lon)
-                .sort((a, b) => (a.distanceKm ?? 999) - (b.distanceKm ?? 999))
-                .slice(0, 20);
+            if (!res.ok) {
+                const errMsg = (results && results.error) || `Request failed (status ${res.status}).`;
+                throw new Error(errMsg);
+            }
 
-            if (results.length === 0) {
+            if (!results || results.length === 0) {
                 setStatus("No hospitals found nearby. Try a different location.", true);
                 return;
             }
 
-            setStatus(`Found ${results.length} hospitals/clinics nearby, sorted by distance.`);
-            renderHospitalList(results);
+            const normalized = results.map((h) => ({
+                name: h.name,
+                type: h.type,
+                address: h.address,
+                phone: h.phone,
+                lat: h.lat,
+                lon: h.lon,
+                distanceKm: h.distance_km,
+            }));
+
+            setStatus(`Found ${normalized.length} hospitals/clinics nearby, sorted by distance.`);
+            renderHospitalList(normalized);
         } catch (err) {
-            setStatus("Couldn't fetch nearby hospitals. Please try again.", true);
+            console.error("fetchNearbyHospitals failed:", err);
+            setStatus(`Couldn't fetch nearby hospitals: ${err.message}`, true);
         }
     }
 
@@ -161,8 +142,19 @@ if (useGpsBtn) {
             (position) => {
                 fetchNearbyHospitals(position.coords.latitude, position.coords.longitude);
             },
-            () => {
-                setStatus("Location access denied. Try typing a location manually instead.", true);
+            (geoError) => {
+                console.error("Geolocation error:", geoError);
+                let message = "Location access failed. Try typing a location manually instead.";
+                if (geoError.code === 1) {
+                    message = "Location permission denied. Allow location access in your browser, or type a location manually.";
+                } else if (geoError.code === 2) {
+                    message = "Your location could not be determined. Try typing a location manually.";
+                } else if (geoError.code === 3) {
+                    message = "Location request timed out. Try again, or type a location manually.";
+                } else if (!window.isSecureContext) {
+                    message = "GPS location requires HTTPS (or localhost). This page isn't running on a secure connection -- try typing a location manually instead.";
+                }
+                setStatus(message, true);
                 showOfflineNotice();
             }
         );
@@ -174,20 +166,19 @@ if (useGpsBtn) {
 
         setStatus(`Looking up "${query}"...`);
         try {
-            // Nominatim (OpenStreetMap) geocoding -- free, no API key required
-            const res = await fetch(
-                `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(query)}`,
-                { headers: { "Accept": "application/json" } }
-            );
-            const results = await res.json();
-            if (!results || results.length === 0) {
-                setStatus(`Couldn't find "${query}". Try a more specific location.`, true);
+            const res = await fetch(`/api/geocode?q=${encodeURIComponent(query)}`);
+            const data = await res.clone().json().catch(() => null);
+
+            if (!res.ok) {
+                const errMsg = (data && data.error) || `Couldn't find "${query}".`;
+                setStatus(errMsg, true);
                 return;
             }
-            const { lat, lon } = results[0];
-            fetchNearbyHospitals(parseFloat(lat), parseFloat(lon));
+
+            fetchNearbyHospitals(data.lat, data.lon);
         } catch (err) {
-            setStatus("Location search failed. Please try again.", true);
+            console.error("searchManualLocation failed:", err);
+            setStatus(`Location search failed: ${err.message}`, true);
         }
     }
 
@@ -351,7 +342,9 @@ function renderCheckerResult(data) {
     const colors = verdictColorClasses(data.verdict);
 
     const verdictBadge = document.getElementById("verdictBadge");
-    verdictBadge.className = `p-5 rounded-2xl border flex flex-col gap-2 ${colors.badge}`;
+    if (verdictBadge) {
+        verdictBadge.className = `p-5 rounded-2xl border flex flex-col gap-2 ${colors.badge}`;
+    }
 
     // If the claim came from an uploaded screenshot, show the OCR'd text so
     // the user can confirm it was read correctly before trusting the verdict.
@@ -374,46 +367,73 @@ function renderCheckerResult(data) {
             html += `<div><i class="fa-solid fa-language mr-1"></i>Text used for verification (translated to English): "${escapeHtml(data.claim_text_used)}"</div>`;
         }
         debugNote.innerHTML = html;
-        verdictBadge.parentElement.insertBefore(debugNote, verdictBadge);
+        if (verdictBadge && verdictBadge.parentElement) {
+            verdictBadge.parentElement.insertBefore(debugNote, verdictBadge);
+        }
     }
 
-    document.getElementById("verdictLabel").textContent = displayVerdictLabel(data.verdict);
-    document.getElementById("explanationText").textContent = data.explanation || "";
+    const verdictLabel = document.getElementById("verdictLabel");
+    if (verdictLabel) {
+        verdictLabel.textContent = displayVerdictLabel(data.verdict);
+    }
+
+    const explanationText = document.getElementById("explanationText");
+    if (explanationText) {
+        explanationText.textContent = data.explanation || "";
+    }
 
     const confidence = Number(data.confidence) || 0;
-    document.getElementById("confidenceValue").textContent = `${confidence}%`;
+    const confidenceValue = document.getElementById("confidenceValue");
+    if (confidenceValue) {
+        confidenceValue.textContent = `${confidence}%`;
+    }
     const bar = document.getElementById("confidenceBar");
-    bar.style.width = `${confidence}%`;
-    bar.className = `h-full transition-all duration-500 ${colors.bar}`;
+    if (bar) {
+        bar.style.width = `${confidence}%`;
+        bar.className = `h-full transition-all duration-500 ${colors.bar}`;
+    }
 
     const entityContainer = document.getElementById("entityContainer");
-    entityContainer.innerHTML = "";
-    (data.entities || []).forEach((ent) => {
-        const chip = document.createElement("span");
-        chip.className = "text-[11px] font-bold bg-blue-50 text-blue-700 px-2.5 py-1 rounded-full border border-blue-100";
-        chip.textContent = `${ent.text} · ${ent.label}`;
-        entityContainer.appendChild(chip);
-    });
-    if (!data.entities || data.entities.length === 0) {
-        entityContainer.innerHTML = `<span class="text-xs text-slate-400">No entities detected.</span>`;
+    if (entityContainer) {
+        entityContainer.innerHTML = "";
+    }
+    if (entityContainer) {
+        (data.entities || []).forEach((ent) => {
+            const chip = document.createElement("span");
+            chip.className = "text-[11px] font-bold bg-blue-50 text-blue-700 px-2.5 py-1 rounded-full border border-blue-100";
+            chip.textContent = `${ent.text} · ${ent.label}`;
+            entityContainer.appendChild(chip);
+        });
+        if (!data.entities || data.entities.length === 0) {
+            entityContainer.innerHTML = `<span class="text-xs text-slate-400">No entities detected.</span>`;
+        }
     }
 
     const sourceContainer = document.getElementById("sourceContainer");
-    sourceContainer.innerHTML = "";
-    (data.sources || []).forEach((src) => {
-        const line = document.createElement("div");
-        line.innerHTML = `<i class="fa-solid fa-check text-emerald-500 mr-1"></i> ${escapeHtml(src)}`;
-        sourceContainer.appendChild(line);
-    });
-    if (!data.sources || data.sources.length === 0) {
-        sourceContainer.innerHTML = `<span class="text-xs text-slate-400">No sources returned.</span>`;
+    if (sourceContainer) {
+        sourceContainer.innerHTML = "";
+        (data.sources || []).forEach((src) => {
+            const line = document.createElement("div");
+            line.innerHTML = `<i class="fa-solid fa-check text-emerald-500 mr-1"></i> ${escapeHtml(src)}`;
+            sourceContainer.appendChild(line);
+        });
+        if (!data.sources || data.sources.length === 0) {
+            sourceContainer.innerHTML = `<span class="text-xs text-slate-400">No sources returned.</span>`;
+        }
     }
 
     // ---- Method Comparison: BERT vs RAG vs GNN ----
     renderMethodComparison(data.method_comparison);
 
-    document.getElementById("shareVerdict").textContent = `Verdict: ${displayVerdictLabel(data.verdict)}`;
-    document.getElementById("shareExplanation").textContent = data.explanation || "";
+    const shareVerdict = document.getElementById("shareVerdict");
+    if (shareVerdict) {
+        shareVerdict.textContent = `Verdict: ${displayVerdictLabel(data.verdict)}`;
+    }
+
+    const shareExplanation = document.getElementById("shareExplanation");
+    if (shareExplanation) {
+        shareExplanation.textContent = data.explanation || "";
+    }
 
     // ---- Text-to-speech: read the verdict + explanation aloud ----
     const speakBtn = document.getElementById("speakResultBtn");

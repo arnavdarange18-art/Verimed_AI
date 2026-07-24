@@ -21,11 +21,10 @@ from comparison import compute_method_comparison
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("FLASK_SECRET_KEY", "dev-only-change-me")
-
-# Cache-busting: bump this automatically on every server restart, so
-# templates/base.html's ?v=... query param always forces browsers to fetch
-# the current CSS/JS instead of serving a stale cached copy after a deploy.
 import time
+
+# Cache-busting: bump this automatically on every server restart so
+# templates' `?v=` query param forces browsers to fetch the latest JS/CSS.
 app.config["ASSET_VERSION"] = str(int(time.time()))
 
 login_manager = LoginManager()
@@ -133,6 +132,121 @@ def logout():
 @app.route('/emergency-help')
 def emergency_help():
     return render_template('emergency_help.html')
+
+
+@app.route('/api/geocode', methods=['GET'])
+def api_geocode():
+    """
+    Server-side proxy for Nominatim (OpenStreetMap) geocoding.
+
+    Calling Nominatim directly from browser JS is unreliable: their usage
+    policy requires a proper identifying User-Agent header, which browser
+    fetch() cannot set (the browser overrides it), so many client-side
+    requests get silently blocked or rate-limited. Proxying through the
+    backend lets us set a real User-Agent and see the actual error if one
+    occurs, instead of a mysterious client-side failure.
+    """
+    import requests
+
+    query = request.args.get('q', '').strip()
+    if not query:
+        return jsonify({"error": "No location query provided."}), 400
+
+    try:
+        resp = requests.get(
+            "https://nominatim.openstreetmap.org/search",
+            params={"format": "json", "limit": 1, "q": query},
+            headers={"User-Agent": "VeriMedAI-Hackathon-Project/1.0 (educational project)"},
+            timeout=10,
+        )
+        resp.raise_for_status()
+        results = resp.json()
+        if not results:
+            return jsonify({"error": f'Could not find "{query}".'}), 404
+
+        return jsonify({"lat": float(results[0]["lat"]), "lon": float(results[0]["lon"])})
+
+    except requests.exceptions.RequestException as e:
+        app.logger.error(f"[api_geocode] Nominatim request failed: {e}")
+        return jsonify({"error": "Location lookup service is unavailable right now."}), 502
+
+
+@app.route('/api/nearby_hospitals', methods=['GET'])
+def api_nearby_hospitals():
+    """
+    Server-side proxy for Overpass API (OpenStreetMap) hospital/clinic search.
+    Same rationale as api_geocode -- avoids client-side CORS/rate-limit
+    issues and gives us real server-side error logging.
+    """
+    import requests
+    import math
+
+    try:
+        lat = float(request.args.get('lat'))
+        lon = float(request.args.get('lon'))
+    except (TypeError, ValueError):
+        return jsonify({"error": "Valid lat/lon parameters are required."}), 400
+
+    overpass_query = f"""
+        [out:json][timeout:25];
+        (
+          node["amenity"="hospital"](around:6000,{lat},{lon});
+          way["amenity"="hospital"](around:6000,{lat},{lon});
+          node["amenity"="clinic"](around:6000,{lat},{lon});
+          way["amenity"="clinic"](around:6000,{lat},{lon});
+        );
+        out center 40;
+    """
+
+    try:
+        resp = requests.post(
+            "https://overpass-api.de/api/interpreter",
+            data={"data": overpass_query},
+            headers={"User-Agent": "VeriMedAI-Hackathon-Project/1.0 (educational project)"},
+            timeout=25,
+        )
+        resp.raise_for_status()
+        elements = resp.json().get("elements", [])
+    except requests.exceptions.RequestException as e:
+        app.logger.error(f"[api_nearby_hospitals] Overpass request failed: {e}")
+        return jsonify({"error": "Hospital search service is unavailable right now."}), 502
+
+    def haversine_km(lat1, lon1, lat2, lon2):
+        R = 6371
+        d_lat = math.radians(lat2 - lat1)
+        d_lon = math.radians(lon2 - lon1)
+        a = (math.sin(d_lat / 2) ** 2
+             + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(d_lon / 2) ** 2)
+        return R * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+
+    def build_address(tags):
+        parts = [tags.get("addr:housenumber"), tags.get("addr:street"),
+                 tags.get("addr:suburb"), tags.get("addr:city"), tags.get("addr:postcode")]
+        parts = [p for p in parts if p]
+        return ", ".join(parts) if parts else "Address not available"
+
+    results = []
+    for el in elements:
+        tags = el.get("tags", {})
+        if not tags.get("name"):
+            continue
+        el_lat = el.get("lat") or (el.get("center") or {}).get("lat")
+        el_lon = el.get("lon") or (el.get("center") or {}).get("lon")
+        if not el_lat or not el_lon:
+            continue
+
+        results.append({
+            "name": tags["name"],
+            "type": "Hospital" if tags.get("amenity") == "hospital" else "Clinic",
+            "address": build_address(tags),
+            "phone": tags.get("phone") or tags.get("contact:phone"),
+            "lat": el_lat,
+            "lon": el_lon,
+            "distance_km": round(haversine_km(lat, lon, el_lat, el_lon), 1),
+        })
+
+    results.sort(key=lambda h: h["distance_km"])
+    return jsonify(results[:20])
 
 
 @app.route('/emergency/<share_token>')

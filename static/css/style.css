@@ -4,15 +4,11 @@ body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 }
 
-/* Keep only the shareable card visible when exporting via window.print() */
-@media print {
-    nav, footer, #checkerForm, #resultsPlaceholder,
-    #verdictBadge, .grid.grid-cols-1.md\:grid-cols-2 {
-        display: none !important;
-    }
-    #shareCardGraphic {
-        box-shadow: none !important;
-    }
+/* Distinctive geometric heading font -- used for h1-h4 and the verdict
+   label so key numbers/verdicts feel more "designed" than default system
+   sans, without touching body copy readability. */
+h1, h2, h3, h4, .font-display {
+    font-family: 'Manrope', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 }
 
 /* Smooth fade-in for result panels */
