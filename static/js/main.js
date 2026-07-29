@@ -1,6 +1,35 @@
 // VeriMed AI -- frontend logic
 // Wires the checker, predictor, and passport pages to the Flask API.
 
+// ---------- Mobile Navigation Menu Toggle ----------
+document.addEventListener("DOMContentLoaded", () => {
+    const mobileToggleBtn = document.getElementById("mobileMenuToggleBtn");
+    const mobileMenu = document.getElementById("mobileMenu");
+    const mobileIcon = document.getElementById("mobileMenuIcon");
+
+    if (mobileToggleBtn && mobileMenu) {
+        mobileToggleBtn.addEventListener("click", (e) => {
+            e.stopPropagation();
+            mobileMenu.classList.toggle("hidden");
+            if (mobileMenu.classList.contains("hidden")) {
+                if (mobileIcon) mobileIcon.className = "fa-solid fa-bars text-xl";
+            } else {
+                if (mobileIcon) mobileIcon.className = "fa-solid fa-xmark text-xl";
+            }
+        });
+
+        // Close mobile menu if clicked outside
+        document.addEventListener("click", (e) => {
+            if (!mobileMenu.contains(e.target) && !mobileToggleBtn.contains(e.target)) {
+                if (!mobileMenu.classList.contains("hidden")) {
+                    mobileMenu.classList.add("hidden");
+                    if (mobileIcon) mobileIcon.className = "fa-solid fa-bars text-xl";
+                }
+            }
+        });
+    }
+});
+
 // ---------- Helpers ----------
 
 let latestVerificationResult = null;

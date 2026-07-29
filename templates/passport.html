@@ -4,96 +4,96 @@
     <a href="/" class="inline-flex items-center gap-2 text-sm font-semibold text-blue-600 hover:text-blue-700"><i class="fa-solid fa-house"></i> Back to Home</a>
 </div>
 <div class="mb-6">
-    <h1 class="text-2xl font-black text-slate-800">Your Health Passport</h1>
-    <p class="text-sm text-slate-500 mt-1">Logged in as <span class="font-bold">{{ user.name }}</span> ({{ user.email }})</p>
+    <h1 class="text-xl sm:text-2xl font-black text-slate-800">Your Health Passport</h1>
+    <p class="text-xs sm:text-sm text-slate-500 mt-1">Logged in as <span class="font-bold text-slate-700">{{ user.name }}</span> ({{ user.email }})</p>
 </div>
 
-<div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-8">
 
     <!-- LEFT COLUMN: forms -->
     <div class="lg:col-span-7 flex flex-col gap-6">
 
         <!-- Personal + Medical Details -->
-        <div class="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm">
-            <h2 class="text-lg font-bold text-slate-800 mb-4"><i class="fa-solid fa-id-card-clip text-emerald-600 mr-2"></i>Personal & Medical Details</h2>
-            <form id="passportForm" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div class="bg-white p-4 sm:p-6 rounded-2xl border border-slate-200/80 shadow-sm">
+            <h2 class="text-base sm:text-lg font-bold text-slate-800 mb-4"><i class="fa-solid fa-id-card-clip text-emerald-600 mr-2"></i>Personal & Medical Details</h2>
+            <form id="passportForm" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                     <label class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">Full Name</label>
-                    <input type="text" id="passName" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs focus:outline-none focus:border-emerald-500" required>
+                    <input type="text" id="passName" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm focus:outline-none focus:border-emerald-500" required>
                 </div>
                 <div>
                     <label class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">Blood Group</label>
-                    <select id="passBlood" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs focus:outline-none focus:border-emerald-500">
+                    <select id="passBlood" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm focus:outline-none focus:border-emerald-500">
                         <option>A+</option><option>O+</option><option>B+</option><option>AB+</option>
                         <option>A-</option><option>O-</option><option>B-</option><option>AB-</option>
                     </select>
                 </div>
-                <div class="md:col-span-2">
+                <div class="sm:col-span-2">
                     <label class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">Date of Birth</label>
-                    <input type="text" id="passDob" placeholder="DD-MM-YYYY" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs focus:outline-none focus:border-emerald-500">
+                    <input type="text" id="passDob" placeholder="DD-MM-YYYY" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm focus:outline-none focus:border-emerald-500">
                 </div>
-                <div class="md:col-span-2">
+                <div class="sm:col-span-2">
                     <label class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">Allergies</label>
-                    <input type="text" id="passAllergies" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs focus:outline-none focus:border-emerald-500" placeholder="e.g. Penicillin, Sulfa drugs, Nuts">
+                    <input type="text" id="passAllergies" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm focus:outline-none focus:border-emerald-500" placeholder="e.g. Penicillin, Sulfa drugs, Nuts">
                 </div>
-                <div class="md:col-span-2">
+                <div class="sm:col-span-2">
                     <label class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">Chronic Diseases</label>
-                    <input type="text" id="passChronic" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs focus:outline-none focus:border-emerald-500" placeholder="e.g. Diabetes, Asthma, Hypertension">
+                    <input type="text" id="passChronic" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm focus:outline-none focus:border-emerald-500" placeholder="e.g. Diabetes, Asthma, Hypertension">
                 </div>
-                <div class="md:col-span-2">
+                <div class="sm:col-span-2">
                     <label class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">Current Medicines</label>
-                    <textarea id="passMeds" rows="2" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs focus:outline-none focus:border-emerald-500"></textarea>
+                    <textarea id="passMeds" rows="2" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm focus:outline-none focus:border-emerald-500"></textarea>
                 </div>
                 <div>
                     <label class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">Emergency Contact Name</label>
-                    <input type="text" id="passContact" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs focus:outline-none focus:border-emerald-500">
+                    <input type="text" id="passContact" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm focus:outline-none focus:border-emerald-500">
                 </div>
                 <div>
                     <label class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">Emergency Contact Phone</label>
-                    <input type="tel" id="passPhone" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs focus:outline-none focus:border-emerald-500">
+                    <input type="tel" id="passPhone" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm focus:outline-none focus:border-emerald-500">
                 </div>
-                <button type="submit" class="md:col-span-2 mt-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-xl transition-colors text-xs tracking-wider uppercase">
+                <button type="submit" class="sm:col-span-2 mt-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3.5 rounded-xl transition-colors text-xs tracking-wider uppercase">
                     Save Passport Details
                 </button>
             </form>
         </div>
 
         <!-- Surgeries -->
-        <div class="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm">
-            <h2 class="text-lg font-bold text-slate-800 mb-4"><i class="fa-solid fa-user-doctor text-blue-600 mr-2"></i>Surgical History</h2>
-            <form id="surgeryForm" class="grid grid-cols-1 md:grid-cols-4 gap-3 mb-4">
-                <input type="text" id="surgeryYear" placeholder="Year" class="md:col-span-1 bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs focus:outline-none focus:border-blue-500" required>
-                <input type="text" id="surgeryDescription" placeholder="e.g. Appendectomy -- brief description" class="md:col-span-2 bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs focus:outline-none focus:border-blue-500" required>
-                <button type="submit" class="md:col-span-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded-xl text-xs uppercase tracking-wider">Add</button>
+        <div class="bg-white p-4 sm:p-6 rounded-2xl border border-slate-200/80 shadow-sm">
+            <h2 class="text-base sm:text-lg font-bold text-slate-800 mb-4"><i class="fa-solid fa-user-doctor text-blue-600 mr-2"></i>Surgical History</h2>
+            <form id="surgeryForm" class="grid grid-cols-1 sm:grid-cols-4 gap-3 mb-4">
+                <input type="text" id="surgeryYear" placeholder="Year" class="sm:col-span-1 bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm focus:outline-none focus:border-blue-500" required>
+                <input type="text" id="surgeryDescription" placeholder="e.g. Appendectomy -- brief description" class="sm:col-span-2 bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm focus:outline-none focus:border-blue-500" required>
+                <button type="submit" class="sm:col-span-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl text-xs uppercase tracking-wider">Add</button>
             </form>
             <div id="surgeryList" class="flex flex-col gap-2"></div>
         </div>
 
         <!-- Vaccinations -->
-        <div class="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm">
-            <h2 class="text-lg font-bold text-slate-800 mb-4"><i class="fa-solid fa-syringe text-emerald-600 mr-2"></i>Vaccination Record</h2>
-            <form id="vaccinationForm" class="grid grid-cols-1 md:grid-cols-4 gap-3 mb-4">
-                <input type="text" id="vaccineName" placeholder="Vaccine name" class="md:col-span-2 bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs focus:outline-none focus:border-emerald-500" required>
-                <input type="text" id="vaccineMonth" placeholder="Month" class="md:col-span-1 bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs focus:outline-none focus:border-emerald-500" required>
-                <input type="text" id="vaccineYear" placeholder="Year" class="md:col-span-1 bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs focus:outline-none focus:border-emerald-500" required>
-                <button type="submit" class="md:col-span-4 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 rounded-xl text-xs uppercase tracking-wider">Add Vaccination</button>
+        <div class="bg-white p-4 sm:p-6 rounded-2xl border border-slate-200/80 shadow-sm">
+            <h2 class="text-base sm:text-lg font-bold text-slate-800 mb-4"><i class="fa-solid fa-syringe text-emerald-600 mr-2"></i>Vaccination Record</h2>
+            <form id="vaccinationForm" class="grid grid-cols-1 sm:grid-cols-4 gap-3 mb-4">
+                <input type="text" id="vaccineName" placeholder="Vaccine name" class="sm:col-span-2 bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm focus:outline-none focus:border-emerald-500" required>
+                <input type="text" id="vaccineMonth" placeholder="Month" class="sm:col-span-1 bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm focus:outline-none focus:border-emerald-500" required>
+                <input type="text" id="vaccineYear" placeholder="Year" class="sm:col-span-1 bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm focus:outline-none focus:border-emerald-500" required>
+                <button type="submit" class="sm:col-span-4 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-xl text-xs uppercase tracking-wider">Add Vaccination</button>
             </form>
             <div id="vaccinationList" class="flex flex-col gap-2"></div>
         </div>
 
         <!-- Medical Report Uploads -->
-        <div class="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm">
-            <h2 class="text-lg font-bold text-slate-800 mb-4"><i class="fa-solid fa-file-medical text-purple-600 mr-2"></i>Medical Report Documents</h2>
-            <form id="reportForm" class="grid grid-cols-1 md:grid-cols-4 gap-3 mb-4" enctype="multipart/form-data">
-                <input type="file" id="reportFile" class="md:col-span-4 bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs focus:outline-none focus:border-purple-500" required>
-                <select id="reportCategory" class="md:col-span-2 bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs focus:outline-none focus:border-purple-500">
+        <div class="bg-white p-4 sm:p-6 rounded-2xl border border-slate-200/80 shadow-sm">
+            <h2 class="text-base sm:text-lg font-bold text-slate-800 mb-4"><i class="fa-solid fa-file-medical text-purple-600 mr-2"></i>Medical Report Documents</h2>
+            <form id="reportForm" class="grid grid-cols-1 sm:grid-cols-4 gap-3 mb-4" enctype="multipart/form-data">
+                <input type="file" id="reportFile" class="sm:col-span-4 bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs focus:outline-none focus:border-purple-500" required>
+                <select id="reportCategory" class="sm:col-span-2 bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm focus:outline-none focus:border-purple-500">
                     <option>Blood Report</option><option>MRI</option><option>X-Ray</option>
                     <option>ECG</option><option>Prescription</option><option>CT Scan</option>
                     <option>Discharge Summary</option><option>Other</option>
                 </select>
-                <input type="text" id="reportMonth" placeholder="Month" class="md:col-span-1 bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs focus:outline-none focus:border-purple-500">
-                <input type="text" id="reportYear" placeholder="Year" class="md:col-span-1 bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs focus:outline-none focus:border-purple-500">
-                <button type="submit" class="md:col-span-4 bg-purple-600 hover:bg-purple-700 text-white font-bold py-2.5 rounded-xl text-xs uppercase tracking-wider">Upload Report</button>
+                <input type="text" id="reportMonth" placeholder="Month" class="sm:col-span-1 bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm focus:outline-none focus:border-purple-500">
+                <input type="text" id="reportYear" placeholder="Year" class="sm:col-span-1 bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm focus:outline-none focus:border-purple-500">
+                <button type="submit" class="sm:col-span-4 bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 rounded-xl text-xs uppercase tracking-wider">Upload Report</button>
             </form>
             <div id="reportList" class="flex flex-col gap-2"></div>
         </div>
@@ -101,18 +101,18 @@
 
     <!-- RIGHT COLUMN: QR + PDF -->
     <div class="lg:col-span-5 flex flex-col gap-6">
-        <div class="bg-gradient-to-br from-emerald-800 to-teal-950 text-white p-6 rounded-2xl shadow-lg flex flex-col items-center justify-center text-center gap-4 min-h-[300px] sticky top-24">
-            <h4 class="font-bold text-sm tracking-wider uppercase text-emerald-300">Emergency QR Code</h4>
+        <div class="bg-gradient-to-br from-emerald-800 to-teal-950 text-white p-6 rounded-2xl shadow-lg flex flex-col items-center justify-center text-center gap-4 min-h-[300px] static lg:sticky lg:top-24">
+            <h4 class="font-bold text-xs sm:text-sm tracking-wider uppercase text-emerald-300">Emergency QR Code</h4>
             <div class="bg-white p-4 rounded-xl shadow-inner inline-block" id="qrContainer">
-                <i class="fa-solid fa-qrcode text-8xl text-slate-300 p-4"></i>
+                <i class="fa-solid fa-qrcode text-7xl sm:text-8xl text-slate-300 p-2 sm:p-4"></i>
             </div>
-            <p class="text-[11px] text-emerald-200/80 max-w-xs leading-relaxed">
+            <p class="text-xs text-emerald-200/80 max-w-xs leading-relaxed">
                 Any phone camera can scan this -- opens a read-only emergency summary instantly. No app or login needed for whoever scans it.
             </p>
-            <a href="/api/passport/pdf" id="downloadPdfBtn" class="w-full bg-white text-emerald-800 font-bold py-3 rounded-xl hover:bg-emerald-50 transition-colors text-xs uppercase tracking-wider">
+            <a href="/api/passport/pdf" id="downloadPdfBtn" class="w-full bg-white text-emerald-800 font-bold py-3 rounded-xl hover:bg-emerald-50 transition-colors text-xs uppercase tracking-wider flex items-center justify-center">
                 <i class="fa-solid fa-file-pdf mr-2"></i>Download Printable PDF
             </a>
         </div>
     </div>
 </div>
-{% endblock %}
+{% endblock %}

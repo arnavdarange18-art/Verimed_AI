@@ -2,48 +2,89 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>VeriMed AI - Health Integrity Platform</title>
     <!-- Tailwind CSS Engine for Quick Structural Utilities -->
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v={{ config.get('ASSET_VERSION', '1') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v={{ config.get('ASSET_VERSION', '2') }}">
     <!-- FontAwesome Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
-<body class="bg-slate-50 min-h-screen flex flex-col">
+<body class="bg-slate-50 min-h-screen flex flex-col antialiased overflow-x-hidden">
 
     <!-- Top Navigation Bar -->
-    <nav class="bg-white border-b border-slate-200 px-6 py-4 flex justify-between items-center sticky top-0 z-50">
-        <div class="flex items-center gap-3">
-            <div class="bg-blue-600 text-white p-2 rounded-xl shadow-md shadow-blue-200">
-                <i class="fa-solid fa-user-md text-xl"></i>
+    <nav class="bg-white/95 backdrop-blur-md border-b border-slate-200 sticky top-0 z-50 px-4 sm:px-6 py-3">
+        <div class="max-w-7xl mx-auto flex justify-between items-center">
+            <!-- Brand Logo -->
+            <a href="/" class="flex items-center gap-2.5">
+                <div class="bg-blue-600 text-white p-2 rounded-xl shadow-md shadow-blue-200 shrink-0">
+                    <i class="fa-solid fa-user-md text-lg sm:text-xl"></i>
+                </div>
+                <div class="min-w-0">
+                    <span class="font-extrabold text-lg sm:text-xl text-slate-800 tracking-tight block leading-tight font-display">VeriMed AI</span>
+                    <span class="text-[10px] sm:text-xs block text-slate-400 font-semibold tracking-wider uppercase truncate">Verify Before You Trust</span>
+                </div>
+            </a>
+
+            <!-- Desktop Navigation Links -->
+            <div class="hidden md:flex items-center gap-6 font-semibold text-sm text-slate-600">
+                <a href="/checker" class="hover:text-blue-600 transition-colors flex items-center gap-1.5"><i class="fa-solid fa-magnifying-glass-shield text-blue-500"></i> AI Fact Checker</a>
+                <a href="/passport" class="hover:text-blue-600 transition-colors flex items-center gap-1.5"><i class="fa-solid fa-id-card-clip text-emerald-500"></i> Health Passport</a>
+                <a href="/emergency-help" class="text-red-500 hover:text-red-700 transition-colors font-bold flex items-center gap-1.5"><i class="fa-solid fa-truck-medical"></i> Emergency</a>
+                {% if current_user.is_authenticated %}
+                    <span class="text-slate-300">|</span>
+                    <span class="text-slate-600 font-bold flex items-center gap-1.5"><i class="fa-solid fa-circle-user text-blue-600"></i>{{ current_user.name }}</span>
+                    <a href="/logout" class="text-red-500 hover:text-red-700 transition-colors flex items-center gap-1.5"><i class="fa-solid fa-right-from-bracket"></i>Logout</a>
+                {% else %}
+                    <span class="text-slate-300">|</span>
+                    <a href="/login" class="hover:text-blue-600 transition-colors font-bold">Login</a>
+                    <a href="/register" class="bg-blue-600 text-white px-4 py-2 rounded-xl hover:bg-blue-700 transition-colors shadow-md shadow-blue-100 font-bold">Register</a>
+                {% endif %}
             </div>
-            <div>
-                <span class="font-extrabold text-xl text-slate-800 tracking-tight">VeriMed AI</span>
-                <span class="text-xs block text-slate-400 font-semibold tracking-wider uppercase">Verify Before You Trust</span>
-            </div>
+
+            <!-- Mobile Hamburger Toggle Button -->
+            <button id="mobileMenuToggleBtn" type="button" aria-label="Toggle Navigation Menu" class="md:hidden text-slate-700 hover:text-blue-600 p-2 rounded-xl hover:bg-slate-100 transition-colors">
+                <i id="mobileMenuIcon" class="fa-solid fa-bars text-xl"></i>
+            </button>
         </div>
-        <div class="flex items-center gap-6 font-semibold text-sm text-slate-600">
-            <a href="/checker" class="hover:text-blue-600 transition-colors"><i class="fa-solid fa-magnifying-glass-shield mr-1"></i> AI Fact Checker</a>
-            <a href="/passport" class="hover:text-blue-600 transition-colors"><i class="fa-solid fa-id-card-clip mr-1"></i> Health Passport</a>
-            <a href="/emergency-help" class="text-red-500 hover:text-red-700 transition-colors font-bold"><i class="fa-solid fa-truck-medical mr-1"></i> Emergency</a>
-            {% if current_user.is_authenticated %}
-                <span class="text-slate-400">|</span>
-                <span class="text-slate-500"><i class="fa-solid fa-circle-user mr-1"></i>{{ current_user.name }}</span>
-                <a href="/logout" class="text-red-500 hover:text-red-700 transition-colors"><i class="fa-solid fa-right-from-bracket mr-1"></i>Logout</a>
-            {% else %}
-                <span class="text-slate-400">|</span>
-                <a href="/login" class="hover:text-blue-600 transition-colors">Login</a>
-                <a href="/register" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors">Register</a>
-            {% endif %}
+
+        <!-- Mobile Menu Dropdown -->
+        <div id="mobileMenu" class="hidden md:hidden pt-3 pb-2 border-t border-slate-100 mt-3 space-y-1 font-semibold text-sm text-slate-700">
+            <a href="/" class="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-slate-100 transition-colors">
+                <i class="fa-solid fa-house text-blue-600 w-5"></i> Home
+            </a>
+            <a href="/checker" class="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-slate-100 transition-colors">
+                <i class="fa-solid fa-magnifying-glass-shield text-blue-600 w-5"></i> AI Fact Checker
+            </a>
+            <a href="/passport" class="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-slate-100 transition-colors">
+                <i class="fa-solid fa-id-card-clip text-emerald-600 w-5"></i> Health Passport
+            </a>
+            <a href="/emergency-help" class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-red-600 bg-red-50 hover:bg-red-100 font-bold transition-colors">
+                <i class="fa-solid fa-truck-medical text-red-600 w-5"></i> Emergency Help
+            </a>
+            <div class="border-t border-slate-100 pt-2 mt-2">
+                {% if current_user.is_authenticated %}
+                    <div class="px-3 py-1 text-xs font-bold uppercase tracking-wider text-slate-400">
+                        Signed in as <span class="text-slate-700 font-bold">{{ current_user.name }}</span>
+                    </div>
+                    <a href="/logout" class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-red-600 hover:bg-red-50 transition-colors">
+                        <i class="fa-solid fa-right-from-bracket text-red-600 w-5"></i> Logout
+                    </a>
+                {% else %}
+                    <div class="grid grid-cols-2 gap-2 px-1 pt-1">
+                        <a href="/login" class="text-center py-2.5 px-4 rounded-xl border border-slate-200 text-slate-700 font-bold hover:bg-slate-50 transition-colors">Login</a>
+                        <a href="/register" class="text-center py-2.5 px-4 rounded-xl bg-blue-600 text-white font-bold hover:bg-blue-700 transition-colors">Register</a>
+                    </div>
+                {% endif %}
+            </div>
         </div>
     </nav>
 
     {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
-        <div class="max-w-7xl w-full mx-auto px-6 pt-4">
+        <div class="max-w-7xl w-full mx-auto px-4 sm:px-6 pt-4">
             {% for category, message in messages %}
             <div class="p-3 rounded-xl text-sm font-semibold mb-2 {{ 'bg-red-50 text-red-700 border border-red-200' if category == 'error' else 'bg-emerald-50 text-emerald-700 border border-emerald-200' }}">
                 {{ message }}
@@ -54,14 +95,14 @@
     {% endwith %}
 
     <!-- Main Dynamic Content Wrapper -->
-    <main class="flex-1 max-w-7xl w-full mx-auto p-6">
+    <main class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6">
         {% block content %}{% endblock %}
     </main>
 
-    <footer class="text-center py-6 text-xs font-semibold text-slate-400 border-t border-slate-200 bg-white">
+    <footer class="text-center py-6 px-4 text-xs font-semibold text-slate-400 border-t border-slate-200 bg-white">
         Data Grounded via Live Academic Access Channels: WHO &middot; CDC &middot; NIH &middot; PubMed
     </footer>
 
-    <script src="{{ url_for('static', filename='js/main.js') }}?v={{ config.get('ASSET_VERSION', '1') }}"></script>
+    <script src="{{ url_for('static', filename='js/main.js') }}?v={{ config.get('ASSET_VERSION', '2') }}"></script>
 </body>
 </html>

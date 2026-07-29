@@ -1,66 +1,66 @@
 {% extends 'base.html' %}
 {% block content %}
-<div class="mb-8 p-8 rounded-3xl bg-gradient-to-r from-blue-600 via-cyan-600 to-emerald-600 text-white shadow-xl shadow-blue-100">
-    <h1 class="text-3xl font-black mb-2">Verify Before You Trust.</h1>
-    <p class="text-blue-100 max-w-2xl text-sm leading-relaxed mb-6">
+<div class="mb-8 p-5 sm:p-8 rounded-2xl sm:rounded-3xl bg-gradient-to-r from-blue-600 via-cyan-600 to-emerald-600 text-white shadow-xl shadow-blue-100">
+    <h1 class="text-2xl sm:text-3xl font-black mb-2">Verify Before You Trust.</h1>
+    <p class="text-blue-100 max-w-2xl text-xs sm:text-sm leading-relaxed mb-6">
         An advanced, three-layer artificial intelligence framework engineered to detect malicious health fabrications, supply context-aware validation, and map epidemiological virality profiles.
     </p>
-    <div class="flex flex-wrap gap-3">
-        <a href="/checker" class="bg-white text-blue-700 font-bold text-sm px-6 py-3 rounded-xl shadow-lg hover:shadow-xl transition-shadow inline-flex items-center gap-2">
+    <div class="flex flex-col sm:flex-row flex-wrap gap-3">
+        <a href="/checker" class="w-full sm:w-auto bg-white text-blue-700 font-bold text-xs sm:text-sm px-5 py-3 rounded-xl shadow-lg hover:shadow-xl transition-shadow inline-flex items-center justify-center gap-2">
             <i class="fa-solid fa-magnifying-glass-shield"></i> Verify Health Claim
         </a>
-        <a href="/passport" class="bg-white/15 border border-white/40 text-white font-bold text-sm px-6 py-3 rounded-xl hover:bg-white/25 transition-colors inline-flex items-center gap-2">
+        <a href="/passport" class="w-full sm:w-auto bg-white/15 border border-white/40 text-white font-bold text-xs sm:text-sm px-5 py-3 rounded-xl hover:bg-white/25 transition-colors inline-flex items-center justify-center gap-2">
             <i class="fa-solid fa-id-card-clip"></i> Check Your Health Passport
         </a>
-        <a href="/emergency-help" class="bg-red-600 text-white font-bold text-sm px-6 py-3 rounded-xl shadow-lg hover:bg-red-700 transition-colors inline-flex items-center gap-2">
+        <a href="/emergency-help" class="w-full sm:w-auto bg-red-600 text-white font-bold text-xs sm:text-sm px-5 py-3 rounded-xl shadow-lg hover:bg-red-700 transition-colors inline-flex items-center justify-center gap-2">
             <i class="fa-solid fa-truck-medical"></i> Emergency Help
         </a>
     </div>
 </div>
 
 <!-- Live Counter Cards -->
-<div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-    <div class="glass-card p-6 border border-slate-200/60 bg-white/70 rounded-2xl shadow-sm">
-        <span class="text-xs uppercase tracking-wider font-bold text-slate-400">Total Analyzed</span>
-        <h3 class="text-3xl font-black text-slate-800 mt-1">{{ stats.total_checked }}</h3>
+<div class="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-6 mb-8">
+    <div class="p-4 sm:p-6 border border-slate-200/60 bg-white/70 rounded-2xl shadow-sm">
+        <span class="text-[10px] sm:text-xs uppercase tracking-wider font-bold text-slate-400 block truncate">Total Checked</span>
+        <h3 class="text-2xl sm:text-3xl font-black text-slate-800 mt-1 font-display">{{ stats.total_checked }}</h3>
     </div>
-    <div class="glass-card p-6 border border-emerald-200/60 bg-emerald-50/40 rounded-2xl shadow-sm">
-        <span class="text-xs uppercase tracking-wider font-bold text-emerald-600">Verified Genuine</span>
-        <h3 class="text-3xl font-black text-emerald-700 mt-1">{{ stats.true_count }}</h3>
+    <div class="p-4 sm:p-6 border border-emerald-200/60 bg-emerald-50/40 rounded-2xl shadow-sm">
+        <span class="text-[10px] sm:text-xs uppercase tracking-wider font-bold text-emerald-600 block truncate">Verified Genuine</span>
+        <h3 class="text-2xl sm:text-3xl font-black text-emerald-700 mt-1 font-display">{{ stats.true_count }}</h3>
     </div>
-    <div class="glass-card p-6 border border-red-200/60 bg-red-50/40 rounded-2xl shadow-sm">
-        <span class="text-xs uppercase tracking-wider font-bold text-red-600">Fabricated Myths</span>
-        <h3 class="text-3xl font-black text-red-700 mt-1">{{ stats.false_count }}</h3>
+    <div class="p-4 sm:p-6 border border-red-200/60 bg-red-50/40 rounded-2xl shadow-sm">
+        <span class="text-[10px] sm:text-xs uppercase tracking-wider font-bold text-red-600 block truncate">Fabricated Myths</span>
+        <h3 class="text-2xl sm:text-3xl font-black text-red-700 mt-1 font-display">{{ stats.false_count }}</h3>
     </div>
-    <div class="glass-card p-6 border border-amber-200/60 bg-amber-50/40 rounded-2xl shadow-sm">
-        <span class="text-xs uppercase tracking-wider font-bold text-amber-600">Misleading Details</span>
-        <h3 class="text-3xl font-black text-amber-700 mt-1">{{ stats.misleading_count }}</h3>
+    <div class="p-4 sm:p-6 border border-amber-200/60 bg-amber-50/40 rounded-2xl shadow-sm">
+        <span class="text-[10px] sm:text-xs uppercase tracking-wider font-bold text-amber-600 block truncate">Misleading</span>
+        <h3 class="text-2xl sm:text-3xl font-black text-amber-700 mt-1 font-display">{{ stats.misleading_count }}</h3>
     </div>
 </div>
 
 <!-- Architecture Framework Overview -->
-<h3 class="font-black text-xl text-slate-800 mb-1"><i class="fa-solid fa-layer-group text-blue-500 mr-2"></i>Architecture Framework Overview</h3>
-<p class="text-sm text-slate-500 mb-6">Three independent AI layers work together -- detection and evidence grounding, plus a separate spread-risk model -- to verify claims and flag which ones deserve urgent attention.</p>
-<div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-    <div class="bg-white p-6 border border-slate-100 rounded-2xl shadow-sm hover:shadow-md transition-shadow">
-        <div class="text-blue-600 bg-blue-50 w-12 h-12 rounded-xl flex items-center justify-center text-xl mb-4 font-bold">01</div>
-        <h4 class="font-bold text-lg text-slate-800 mb-2">BERT Detection Layer</h4>
-        <p class="text-sm text-slate-500 leading-relaxed">Extracts biomedical tags and filters claims via semantic context classifications using deep learning.</p>
+<h3 class="font-black text-lg sm:text-xl text-slate-800 mb-1"><i class="fa-solid fa-layer-group text-blue-500 mr-2"></i>Architecture Framework Overview</h3>
+<p class="text-xs sm:text-sm text-slate-500 mb-6">Three independent AI layers work together -- detection and evidence grounding, plus a separate spread-risk model -- to verify claims and flag which ones deserve urgent attention.</p>
+<div class="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
+    <div class="bg-white p-5 sm:p-6 border border-slate-100 rounded-2xl shadow-sm hover:shadow-md transition-shadow">
+        <div class="text-blue-600 bg-blue-50 w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center text-lg sm:text-xl mb-4 font-bold">01</div>
+        <h4 class="font-bold text-base sm:text-lg text-slate-800 mb-2">BERT Detection Layer</h4>
+        <p class="text-xs sm:text-sm text-slate-500 leading-relaxed">Extracts biomedical tags and filters claims via semantic context classifications using deep learning.</p>
     </div>
-    <div class="bg-white p-6 border border-slate-100 rounded-2xl shadow-sm hover:shadow-md transition-shadow">
-        <div class="text-cyan-600 bg-cyan-50 w-12 h-12 rounded-xl flex items-center justify-center text-xl mb-4 font-bold">02</div>
-        <h4 class="font-bold text-lg text-slate-800 mb-2">RAG Context Engine</h4>
-        <p class="text-sm text-slate-500 leading-relaxed">Retrieves ground-truth documentation from live biological repositories, nullifying generative hallucination risks[cite: 1].</p>
+    <div class="bg-white p-5 sm:p-6 border border-slate-100 rounded-2xl shadow-sm hover:shadow-md transition-shadow">
+        <div class="text-cyan-600 bg-cyan-50 w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center text-lg sm:text-xl mb-4 font-bold">02</div>
+        <h4 class="font-bold text-base sm:text-lg text-slate-800 mb-2">RAG Context Engine</h4>
+        <p class="text-xs sm:text-sm text-slate-500 leading-relaxed">Retrieves ground-truth documentation from live biological repositories, nullifying generative hallucination risks.</p>
     </div>
-    <div class="bg-white p-6 border border-slate-100 rounded-2xl shadow-sm hover:shadow-md transition-shadow">
-        <div class="text-emerald-600 bg-emerald-50 w-12 h-12 rounded-xl flex items-center justify-center text-xl mb-4 font-bold">03</div>
-        <h4 class="font-bold text-lg text-slate-800 mb-2">GNN Network Modeler</h4>
-        <p class="text-sm text-slate-500 leading-relaxed">Constructs structured relationship topologies to dynamically predict macro-level sharing virality vectors[cite: 1].</p>
+    <div class="bg-white p-5 sm:p-6 border border-slate-100 rounded-2xl shadow-sm hover:shadow-md transition-shadow">
+        <div class="text-emerald-600 bg-emerald-50 w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center text-lg sm:text-xl mb-4 font-bold">03</div>
+        <h4 class="font-bold text-base sm:text-lg text-slate-800 mb-2">GNN Network Modeler</h4>
+        <p class="text-xs sm:text-sm text-slate-500 leading-relaxed">Constructs structured relationship topologies to dynamically predict macro-level sharing virality vectors.</p>
     </div>
 </div>
 
 <!-- Personalized Snapshot -- ties Health Passport into the home page -->
-<div class="mt-8 grid grid-cols-1 md:grid-cols-3 gap-6">
+<div class="mt-8 grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
     <div id="passportSnapshotEmpty" class="md:col-span-3 bg-white p-6 border border-dashed border-slate-300 rounded-2xl text-center hidden">
         <i class="fa-solid fa-id-card-clip text-3xl text-slate-300 mb-3"></i>
         <p class="text-sm font-bold text-slate-500">No Health Passport set up yet</p>
@@ -68,32 +68,32 @@
         <a href="/passport" class="inline-block bg-blue-600 text-white text-xs font-bold px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors">Set Up Health Passport</a>
     </div>
 
-    <div id="passportSnapshotCard" class="md:col-span-2 bg-white p-6 border border-slate-100 rounded-2xl shadow-sm hidden">
+    <div id="passportSnapshotCard" class="md:col-span-2 bg-white p-5 sm:p-6 border border-slate-100 rounded-2xl shadow-sm hidden">
         <div class="flex items-center justify-between mb-4">
-            <h4 class="font-bold text-lg text-slate-800"><i class="fa-solid fa-id-card-clip text-blue-600 mr-2"></i>Your Health Snapshot</h4>
+            <h4 class="font-bold text-base sm:text-lg text-slate-800"><i class="fa-solid fa-id-card-clip text-blue-600 mr-2"></i>Your Health Snapshot</h4>
             <a href="/passport" class="text-xs font-bold text-blue-600 hover:underline">Edit</a>
         </div>
-        <div class="grid grid-cols-2 gap-3 text-sm">
-            <div><span class="text-xs uppercase font-bold text-slate-400 block">Name</span><span id="snapName" class="font-semibold text-slate-700">--</span></div>
-            <div><span class="text-xs uppercase font-bold text-slate-400 block">Blood Group</span><span id="snapBlood" class="font-semibold text-slate-700">--</span></div>
-            <div class="col-span-2"><span class="text-xs uppercase font-bold text-slate-400 block">Allergies</span><span id="snapAllergies" class="font-semibold text-slate-700">--</span></div>
-            <div class="col-span-2"><span class="text-xs uppercase font-bold text-slate-400 block">Current Medicines</span><span id="snapMeds" class="font-semibold text-slate-700">--</span></div>
+        <div class="grid grid-cols-2 gap-3 text-xs sm:text-sm">
+            <div><span class="text-[10px] uppercase font-bold text-slate-400 block">Name</span><span id="snapName" class="font-semibold text-slate-700">--</span></div>
+            <div><span class="text-[10px] uppercase font-bold text-slate-400 block">Blood Group</span><span id="snapBlood" class="font-semibold text-slate-700">--</span></div>
+            <div class="col-span-2"><span class="text-[10px] uppercase font-bold text-slate-400 block">Allergies</span><span id="snapAllergies" class="font-semibold text-slate-700">--</span></div>
+            <div class="col-span-2"><span class="text-[10px] uppercase font-bold text-slate-400 block">Current Medicines</span><span id="snapMeds" class="font-semibold text-slate-700">--</span></div>
         </div>
     </div>
-    <div id="passportSnapshotQr" class="bg-slate-900 p-6 rounded-2xl shadow-sm flex flex-col items-center justify-center hidden">
+    <div id="passportSnapshotQr" class="bg-slate-900 p-5 sm:p-6 rounded-2xl shadow-sm flex flex-col items-center justify-center hidden">
         <span class="text-[10px] uppercase tracking-wider font-bold text-slate-400 mb-3">Emergency QR</span>
         <div id="snapQrContainer" class="bg-white p-2 rounded-xl"></div>
-        <span class="text-[10px] text-slate-500 mt-3 text-center">Scan for emergency medical info</span>
+        <span class="text-[10px] text-slate-400 mt-3 text-center">Scan for emergency medical info</span>
     </div>
 </div>
 
 <!-- Latest Health Alerts -- live from checked-claim history -->
-<div class="mt-10">
+<div class="mt-8 sm:mt-10">
     <div class="flex items-center justify-between mb-4">
-        <h3 class="font-black text-xl text-slate-800"><i class="fa-solid fa-triangle-exclamation text-amber-500 mr-2"></i>Latest Health Alerts</h3>
-        <a href="/checker" class="text-xs font-bold text-blue-600 hover:underline">Check a new claim &rarr;</a>
+        <h3 class="font-black text-lg sm:text-xl text-slate-800"><i class="fa-solid fa-triangle-exclamation text-amber-500 mr-2"></i>Latest Health Alerts</h3>
+        <a href="/checker" class="text-xs font-bold text-blue-600 hover:underline">Check new claim &rarr;</a>
     </div>
-    <div id="latestAlertsContainer" class="grid grid-cols-1 md:grid-cols-3 gap-6">
+    <div id="latestAlertsContainer" class="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
         <div class="md:col-span-3 text-center text-slate-400 text-sm py-6">
             <i class="fa-solid fa-spinner fa-spin mr-2"></i>Loading recent activity...
         </div>
@@ -101,10 +101,10 @@
 </div>
 
 <!-- Trending Misinformation -->
-<div class="mt-10">
+<div class="mt-8 sm:mt-10">
     <div class="flex items-center justify-between mb-4">
-        <h3 class="font-black text-xl text-slate-800"><i class="fa-solid fa-arrow-trend-up text-red-500 mr-2"></i>Trending Misinformation</h3>
-        <span class="text-[10px] uppercase font-bold text-slate-400">Most-checked claims, all time</span>
+        <h3 class="font-black text-lg sm:text-xl text-slate-800"><i class="fa-solid fa-arrow-trend-up text-red-500 mr-2"></i>Trending Misinformation</h3>
+        <span class="text-[10px] uppercase font-bold text-slate-400">Most-checked</span>
     </div>
     <div id="trendingContainer" class="flex flex-col gap-3">
         <div class="text-center text-slate-400 text-sm py-6">
@@ -114,25 +114,25 @@
 </div>
 
 <!-- Health Tips -->
-<div class="mt-10">
-    <h3 class="font-black text-xl text-slate-800 mb-4"><i class="fa-solid fa-heart-pulse text-emerald-500 mr-2"></i>Tips for Good Health</h3>
-    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div class="bg-emerald-50 border border-emerald-100 p-5 rounded-2xl">
+<div class="mt-8 sm:mt-10">
+    <h3 class="font-black text-lg sm:text-xl text-slate-800 mb-4"><i class="fa-solid fa-heart-pulse text-emerald-500 mr-2"></i>Tips for Good Health</h3>
+    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+        <div class="bg-emerald-50 border border-emerald-100 p-4 sm:p-5 rounded-2xl">
             <i class="fa-solid fa-droplet text-emerald-600 text-xl mb-2"></i>
             <p class="text-sm font-bold text-slate-700">Stay Hydrated</p>
             <p class="text-xs text-slate-500 mt-1">Hydration needs vary by person -- listen to your body over rigid rules.</p>
         </div>
-        <div class="bg-blue-50 border border-blue-100 p-5 rounded-2xl">
+        <div class="bg-blue-50 border border-blue-100 p-4 sm:p-5 rounded-2xl">
             <i class="fa-solid fa-person-walking text-blue-600 text-xl mb-2"></i>
             <p class="text-sm font-bold text-slate-700">Move Daily</p>
             <p class="text-xs text-slate-500 mt-1">Regular activity lowers cardiovascular risk, confirmed by CDC data.</p>
         </div>
-        <div class="bg-amber-50 border border-amber-100 p-5 rounded-2xl">
+        <div class="bg-amber-50 border border-amber-100 p-4 sm:p-5 rounded-2xl">
             <i class="fa-solid fa-bed text-amber-600 text-xl mb-2"></i>
             <p class="text-sm font-bold text-slate-700">Prioritize Sleep</p>
             <p class="text-xs text-slate-500 mt-1">7-9 hours supports immune function and mental health.</p>
         </div>
-        <div class="bg-purple-50 border border-purple-100 p-5 rounded-2xl">
+        <div class="bg-purple-50 border border-purple-100 p-4 sm:p-5 rounded-2xl">
             <i class="fa-solid fa-magnifying-glass text-purple-600 text-xl mb-2"></i>
             <p class="text-sm font-bold text-slate-700">Verify Before Sharing</p>
             <p class="text-xs text-slate-500 mt-1">Run health claims through VeriMed before forwarding them.</p>
@@ -141,21 +141,21 @@
 </div>
 
 <!-- Testimonials -->
-<div class="mt-10 mb-4">
-    <h3 class="font-black text-xl text-slate-800 mb-4"><i class="fa-solid fa-comment-dots text-blue-500 mr-2"></i>What People Are Saying</h3>
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div class="bg-white p-6 border border-slate-100 rounded-2xl shadow-sm">
-            <p class="text-sm text-slate-500 italic leading-relaxed">"I check every WhatsApp forward here before I trust it now."</p>
+<div class="mt-8 sm:mt-10 mb-4">
+    <h3 class="font-black text-lg sm:text-xl text-slate-800 mb-4"><i class="fa-solid fa-comment-dots text-blue-500 mr-2"></i>What People Are Saying</h3>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
+        <div class="bg-white p-5 sm:p-6 border border-slate-100 rounded-2xl shadow-sm">
+            <p class="text-xs sm:text-sm text-slate-500 italic leading-relaxed">"I check every WhatsApp forward here before I trust it now."</p>
             <p class="text-xs font-bold text-slate-700 mt-3">— Beta Tester</p>
         </div>
-        <div class="bg-white p-6 border border-slate-100 rounded-2xl shadow-sm">
-            <p class="text-sm text-slate-500 italic leading-relaxed">"The Health Passport QR saved us time in the ER when my father couldn't speak clearly."</p>
+        <div class="bg-white p-5 sm:p-6 border border-slate-100 rounded-2xl shadow-sm">
+            <p class="text-xs sm:text-sm text-slate-500 italic leading-relaxed">"The Health Passport QR saved us time in the ER when my father couldn't speak clearly."</p>
             <p class="text-xs font-bold text-slate-700 mt-3">— Beta Tester</p>
         </div>
-        <div class="bg-white p-6 border border-slate-100 rounded-2xl shadow-sm">
-            <p class="text-sm text-slate-500 italic leading-relaxed">"Finally a fact-checker that shows its sources instead of just saying 'false'."</p>
+        <div class="bg-white p-5 sm:p-6 border border-slate-100 rounded-2xl shadow-sm">
+            <p class="text-xs sm:text-sm text-slate-500 italic leading-relaxed">"Finally a fact-checker that shows its sources instead of just saying 'false'."</p>
             <p class="text-xs font-bold text-slate-700 mt-3">— Beta Tester</p>
         </div>
     </div>
 </div>
-{% endblock %}
+{% endblock %}
